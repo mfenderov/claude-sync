@@ -4,10 +4,10 @@ import "fmt"
 
 // OperationError represents a generic git operation failure
 type OperationError struct {
-	Err    error  // Underlying error
-	Op     string // Operation name (e.g., "pull", "push", "commit")
-	Path   string // Repository path
-	Output string // Command output if available
+	Err    error
+	Op     string
+	Path   string
+	Output string
 }
 
 var _ error = &OperationError{}
@@ -25,8 +25,8 @@ func (e *OperationError) Unwrap() error {
 
 // ConflictError represents a merge conflict
 type ConflictError struct {
-	Path  string   // Repository path
-	Files []string // Files with conflicts
+	Path  string
+	Files []string
 }
 
 var _ error = &ConflictError{}

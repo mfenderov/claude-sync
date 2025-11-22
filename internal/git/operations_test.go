@@ -8,23 +8,19 @@ import (
 	"testing"
 )
 
-// Ensure context is recognized as used at package level
 var _ = context.Background
 
-// Helper function to create a test git repository
 func createTestRepo(t *testing.T) string {
 	t.Helper()
 
 	tmpDir := t.TempDir()
 
-	// Initialize git repo
 	cmd := exec.Command("git", "init")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to init git repo: %v", err)
 	}
 
-	// Configure git user
 	cmd = exec.Command("git", "config", "user.email", "test@example.com")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
@@ -37,7 +33,6 @@ func createTestRepo(t *testing.T) string {
 		t.Fatalf("Failed to configure git name: %v", err)
 	}
 
-	// Create initial commit
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("initial content"), 0o644); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -117,7 +112,6 @@ func TestHasUncommittedChanges(t *testing.T) {
 		{
 			name: "no changes",
 			setup: func(dir string) {
-				// No changes needed
 			},
 			expected: false,
 		},
@@ -135,7 +129,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 				newFile := filepath.Join(dir, "new.txt")
 				_ = os.WriteFile(newFile, []byte("new content"), 0o644)
 			},
-			expected: false, // Untracked files don't count as uncommitted changes
+			expected: false,
 		},
 	}
 
@@ -165,7 +159,6 @@ func TestGetChangedFiles(t *testing.T) {
 	ctx := t.Context()
 	dir := createTestRepo(t)
 
-	// Test with no changes
 	files, err := GetChangedFiles(ctx, dir)
 	if err != nil {
 		t.Fatalf("GetChangedFiles() error = %v", err)
@@ -174,7 +167,6 @@ func TestGetChangedFiles(t *testing.T) {
 		t.Errorf("GetChangedFiles() = %v, want empty slice", files)
 	}
 
-	// Modify a file
 	testFile := filepath.Join(dir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("modified"), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
@@ -198,20 +190,17 @@ func TestCommitChanges(t *testing.T) {
 	ctx := t.Context()
 	dir := createTestRepo(t)
 
-	// Modify a file
 	testFile := filepath.Join(dir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("modified"), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	// Commit the changes
 	commitMsg := "Test commit"
 	err := CommitChanges(ctx, dir, commitMsg)
 	if err != nil {
 		t.Fatalf("CommitChanges() error = %v", err)
 	}
 
-	// Verify no uncommitted changes remain
 	hasChanges, err := HasUncommittedChanges(ctx, dir)
 	if err != nil {
 		t.Fatalf("HasUncommittedChanges() error = %v", err)
@@ -220,7 +209,6 @@ func TestCommitChanges(t *testing.T) {
 		t.Error("CommitChanges() did not commit all changes")
 	}
 
-	// Verify commit message
 	cmd := exec.Command("git", "log", "-1", "--pretty=%s")
 	cmd.Dir = dir
 	output, err := cmd.Output()
@@ -245,12 +233,10 @@ func TestGetBranchInfo(t *testing.T) {
 		t.Fatalf("GetBranchInfo() error = %v", err)
 	}
 
-	// Should be on main or master branch
 	if branch != "main" && branch != "master" {
 		t.Errorf("GetBranchInfo() branch = %q, want main or master", branch)
 	}
 
-	// No upstream, so ahead/behind should be 0
 	if ahead != 0 || behind != 0 {
 		t.Errorf("GetBranchInfo() ahead=%d, behind=%d, want 0, 0", ahead, behind)
 	}
@@ -262,7 +248,6 @@ func TestGetRecentCommits(t *testing.T) {
 	ctx := t.Context()
 	dir := createTestRepo(t)
 
-	// Add more commits
 	for i := 0; i < 3; i++ {
 		testFile := filepath.Join(dir, "test.txt")
 		content := []byte("content " + string(rune('A'+i)))
@@ -298,31 +283,24 @@ func TestGenerateAutoCommitMessage(t *testing.T) {
 
 	msg := GenerateAutoCommitMessage()
 
-	// Should contain "Auto-sync"
 	if len(msg) == 0 {
 		t.Error("GenerateAutoCommitMessage() returned empty string")
 	}
 
-	// Should contain timestamp format
 	if len(msg) < 20 {
 		t.Errorf("GenerateAutoCommitMessage() = %q, seems too short", msg)
 	}
 }
 
 func TestGetClaudeDir(t *testing.T) {
-	// Note: Cannot use t.Parallel() here because we modify global environment variable HOME
-
-	// Save original home
 	originalHome := os.Getenv("HOME")
 	defer func() { _ = os.Setenv("HOME", originalHome) }()
 
-	// Test with valid home
 	_, err := os.UserHomeDir()
 	if err != nil {
 		t.Skipf("Cannot get home directory: %v", err)
 	}
 
-	// Create a temporary .claude directory for testing
 	tmpHome := t.TempDir()
 
 	claudeDir := filepath.Join(tmpHome, ".claude")
@@ -343,7 +321,6 @@ func TestGetClaudeDir(t *testing.T) {
 		t.Errorf("GetClaudeDir() = %q, want %q", dir, claudeDir)
 	}
 
-	// Test with non-existent .claude directory
 	if err := os.RemoveAll(claudeDir); err != nil {
 		t.Fatalf("Failed to remove .claude dir: %v", err)
 	}

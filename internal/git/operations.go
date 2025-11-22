@@ -37,7 +37,6 @@ func GetClaudeDir() (string, error) {
 	}
 	claudePath := filepath.Join(home, claudeDir)
 
-	// Check if directory exists
 	if _, err := os.Stat(claudePath); os.IsNotExist(err) {
 		return "", &DirectoryError{
 			Path: claudePath,
@@ -54,11 +53,8 @@ func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff-index", "--quiet", "HEAD", "--")
 	err := cmd.Run()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			// Exit code 1 means there are changes
-			if exitErr.ExitCode() == 1 {
-				return true, nil
-			}
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return true, nil
 		}
 		return false, &OperationError{
 			Op:   "diff-index",
@@ -86,13 +82,11 @@ func GetChangedFiles(ctx context.Context, repoPath string) ([]string, error) {
 
 // CommitChanges commits all tracked changes
 func CommitChanges(ctx context.Context, repoPath string, message string) error {
-	// Stage all tracked files
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "add", "-u")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
 	}
 
-	// Commit
 	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "commit", "-m", message)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to commit: %w\nOutput: %s", err, string(output))
@@ -123,7 +117,6 @@ func Push(ctx context.Context, repoPath string) error {
 
 // GetBranchInfo returns current branch and ahead/behind counts
 func GetBranchInfo(ctx context.Context, repoPath string) (branch string, ahead, behind int, err error) {
-	// Get branch name
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--show-current")
 	output, err := cmd.Output()
 	if err != nil {
@@ -131,11 +124,9 @@ func GetBranchInfo(ctx context.Context, repoPath string) (branch string, ahead, 
 	}
 	branch = strings.TrimSpace(string(output))
 
-	// Get ahead/behind counts
 	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	output, err = cmd.Output()
 	if err != nil {
-		// No upstream or other error, return branch only
 		return branch, 0, 0, nil
 	}
 
@@ -221,13 +212,11 @@ func AddRemote(ctx context.Context, repoPath, name, url string) error {
 
 // InitialCommit creates the initial commit with all files
 func InitialCommit(ctx context.Context, repoPath, message string) error {
-	// Stage all files
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "add", ".")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to stage files: %w\nOutput: %s", err, string(output))
 	}
 
-	// Commit
 	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "commit", "-m", message)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create initial commit: %w\nOutput: %s", err, string(output))
@@ -278,7 +267,6 @@ Thumbs.db
 
 // HasConflicts checks if there are merge conflicts
 func HasConflicts(ctx context.Context, repoPath string) (bool, error) {
-	// Check for unmerged paths
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--name-only", "--diff-filter=U")
 	output, err := cmd.Output()
 	if err != nil {
