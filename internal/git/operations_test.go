@@ -15,16 +15,12 @@ var _ = context.Background
 func createTestRepo(t *testing.T) string {
 	t.Helper()
 
-	tmpDir, err := os.MkdirTemp("", "claude-sync-test-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
+	tmpDir := t.TempDir()
 
 	// Initialize git repo
 	cmd := exec.Command("git", "init")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to init git repo: %v", err)
 	}
 
@@ -32,35 +28,30 @@ func createTestRepo(t *testing.T) string {
 	cmd = exec.Command("git", "config", "user.email", "test@example.com")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to configure git email: %v", err)
 	}
 
 	cmd = exec.Command("git", "config", "user.name", "Test User")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to configure git name: %v", err)
 	}
 
 	// Create initial commit
 	testFile := filepath.Join(tmpDir, "test.txt")
 	if err := os.WriteFile(testFile, []byte("initial content"), 0o644); err != nil {
-		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to add files: %v", err)
 	}
 
 	cmd = exec.Command("git", "commit", "-m", "Initial commit")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create initial commit: %v", err)
 	}
 
@@ -68,29 +59,33 @@ func createTestRepo(t *testing.T) string {
 }
 
 func TestIsGitRepo(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
-		setup    func() string
+		setup    func(*testing.T) string
 		name     string
 		expected bool
 	}{
 		{
 			name: "valid git repository",
-			setup: func() string {
+			setup: func(t *testing.T) string {
+				t.Helper()
 				return createTestRepo(t)
 			},
 			expected: true,
 		},
 		{
 			name: "not a git repository",
-			setup: func() string {
-				tmpDir, _ := os.MkdirTemp("", "claude-sync-test-*")
-				return tmpDir
+			setup: func(t *testing.T) string {
+				t.Helper()
+				return t.TempDir()
 			},
 			expected: false,
 		},
 		{
 			name: "non-existent directory",
-			setup: func() string {
+			setup: func(t *testing.T) string {
+				t.Helper()
 				return "/path/that/does/not/exist"
 			},
 			expected: false,
@@ -99,8 +94,9 @@ func TestIsGitRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := tt.setup()
-			defer func() { _ = os.RemoveAll(dir) }()
+			t.Parallel()
+
+			dir := tt.setup(t)
 
 			result := IsGitRepo(dir)
 			if result != tt.expected {
@@ -111,6 +107,8 @@ func TestIsGitRepo(t *testing.T) {
 }
 
 func TestHasUncommittedChanges(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		setup    func(string)
 		name     string
@@ -143,8 +141,9 @@ func TestHasUncommittedChanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			dir := createTestRepo(t)
-			defer func() { _ = os.RemoveAll(dir) }()
 
 			tt.setup(dir)
 
@@ -161,9 +160,10 @@ func TestHasUncommittedChanges(t *testing.T) {
 }
 
 func TestGetChangedFiles(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	dir := createTestRepo(t)
-	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Test with no changes
 	files, err := GetChangedFiles(ctx, dir)
@@ -193,9 +193,10 @@ func TestGetChangedFiles(t *testing.T) {
 }
 
 func TestCommitChanges(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	dir := createTestRepo(t)
-	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Modify a file
 	testFile := filepath.Join(dir, "test.txt")
@@ -234,9 +235,10 @@ func TestCommitChanges(t *testing.T) {
 }
 
 func TestGetBranchInfo(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	dir := createTestRepo(t)
-	defer func() { _ = os.RemoveAll(dir) }()
 
 	branch, ahead, behind, err := GetBranchInfo(ctx, dir)
 	if err != nil {
@@ -255,9 +257,10 @@ func TestGetBranchInfo(t *testing.T) {
 }
 
 func TestGetRecentCommits(t *testing.T) {
+	t.Parallel()
+
 	ctx := t.Context()
 	dir := createTestRepo(t)
-	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Add more commits
 	for i := 0; i < 3; i++ {
@@ -291,6 +294,8 @@ func TestGetRecentCommits(t *testing.T) {
 }
 
 func TestGenerateAutoCommitMessage(t *testing.T) {
+	t.Parallel()
+
 	msg := GenerateAutoCommitMessage()
 
 	// Should contain "Auto-sync"
@@ -305,6 +310,8 @@ func TestGenerateAutoCommitMessage(t *testing.T) {
 }
 
 func TestGetClaudeDir(t *testing.T) {
+	// Note: Cannot use t.Parallel() here because we modify global environment variable HOME
+
 	// Save original home
 	originalHome := os.Getenv("HOME")
 	defer func() { _ = os.Setenv("HOME", originalHome) }()
@@ -316,11 +323,7 @@ func TestGetClaudeDir(t *testing.T) {
 	}
 
 	// Create a temporary .claude directory for testing
-	tmpHome, err := os.MkdirTemp("", "claude-sync-home-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp home: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpHome) }()
+	tmpHome := t.TempDir()
 
 	claudeDir := filepath.Join(tmpHome, ".claude")
 	if err := os.Mkdir(claudeDir, 0o755); err != nil {
