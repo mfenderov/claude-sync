@@ -26,9 +26,8 @@ func (m confirmModel) Init() tea.Cmd {
 
 // Update implements tea.Model
 func (m confirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
 		case "y", "Y":
 			m.response = true
 			m.done = true
@@ -86,9 +85,8 @@ func (m inputModel) Init() tea.Cmd {
 func (m inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.Type {
 		case tea.KeyEnter:
 			m.done = true
 			return m, tea.Quit

@@ -66,28 +66,33 @@ var (
 			MarginBottom(1)
 )
 
-// Helper functions
+// RenderBox renders content inside a styled box with a title
 func RenderBox(title, content string) string {
 	titleBar := TitleStyle.Render("  " + title + "  ")
 	return BoxStyle.Render(titleBar + "\n\n" + content)
 }
 
+// RenderSuccess renders a success message with an icon
 func RenderSuccess(icon, message string) string {
 	return SuccessStyle.Render(icon+" ") + message
 }
 
+// RenderError renders an error message with an icon
 func RenderError(icon, message string) string {
 	return ErrorStyle.Render(icon+" ") + message
 }
 
+// RenderWarning renders a warning message with an icon
 func RenderWarning(icon, message string) string {
 	return WarningStyle.Render(icon+" ") + message
 }
 
+// RenderInfo renders an info message with an icon
 func RenderInfo(icon, message string) string {
 	return InfoStyle.Render(icon+" ") + message
 }
 
+// RenderMuted renders text in a muted style
 func RenderMuted(text string) string {
 	return MutedStyle.Render(text)
 }

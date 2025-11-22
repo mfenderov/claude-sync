@@ -20,7 +20,7 @@ func createTestRepo(t *testing.T) string {
 	cmd := exec.Command("git", "init")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to init git repo: %v", err)
 	}
 
@@ -28,35 +28,35 @@ func createTestRepo(t *testing.T) string {
 	cmd = exec.Command("git", "config", "user.email", "test@example.com")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to configure git email: %v", err)
 	}
 
 	cmd = exec.Command("git", "config", "user.name", "Test User")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to configure git name: %v", err)
 	}
 
 	// Create initial commit
 	testFile := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("initial content"), 0644); err != nil {
-		os.RemoveAll(tmpDir)
+	if err := os.WriteFile(testFile, []byte("initial content"), 0o644); err != nil {
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
 	cmd = exec.Command("git", "add", ".")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to add files: %v", err)
 	}
 
 	cmd = exec.Command("git", "commit", "-m", "Initial commit")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 		t.Fatalf("Failed to create initial commit: %v", err)
 	}
 
@@ -96,7 +96,7 @@ func TestIsGitRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setup()
-			defer os.RemoveAll(dir)
+			defer func() { _ = os.RemoveAll(dir) }()
 
 			result := IsGitRepo(dir)
 			if result != tt.expected {
@@ -123,7 +123,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 			name: "modified file",
 			setup: func(dir string) {
 				testFile := filepath.Join(dir, "test.txt")
-				os.WriteFile(testFile, []byte("modified content"), 0644)
+				_ = os.WriteFile(testFile, []byte("modified content"), 0o644)
 			},
 			expected: true,
 		},
@@ -131,7 +131,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 			name: "new untracked file",
 			setup: func(dir string) {
 				newFile := filepath.Join(dir, "new.txt")
-				os.WriteFile(newFile, []byte("new content"), 0644)
+				_ = os.WriteFile(newFile, []byte("new content"), 0o644)
 			},
 			expected: false, // Untracked files don't count as uncommitted changes
 		},
@@ -140,7 +140,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := createTestRepo(t)
-			defer os.RemoveAll(dir)
+			defer func() { _ = os.RemoveAll(dir) }()
 
 			tt.setup(dir)
 
@@ -158,7 +158,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 
 func TestGetChangedFiles(t *testing.T) {
 	dir := createTestRepo(t)
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Test with no changes
 	files, err := GetChangedFiles(dir)
@@ -171,7 +171,9 @@ func TestGetChangedFiles(t *testing.T) {
 
 	// Modify a file
 	testFile := filepath.Join(dir, "test.txt")
-	os.WriteFile(testFile, []byte("modified"), 0644)
+	if err := os.WriteFile(testFile, []byte("modified"), 0o644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
 
 	files, err = GetChangedFiles(dir)
 	if err != nil {
@@ -187,11 +189,13 @@ func TestGetChangedFiles(t *testing.T) {
 
 func TestCommitChanges(t *testing.T) {
 	dir := createTestRepo(t)
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Modify a file
 	testFile := filepath.Join(dir, "test.txt")
-	os.WriteFile(testFile, []byte("modified"), 0644)
+	if err := os.WriteFile(testFile, []byte("modified"), 0o644); err != nil {
+		t.Fatalf("Failed to write test file: %v", err)
+	}
 
 	// Commit the changes
 	commitMsg := "Test commit"
@@ -225,7 +229,7 @@ func TestCommitChanges(t *testing.T) {
 
 func TestGetBranchInfo(t *testing.T) {
 	dir := createTestRepo(t)
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	branch, ahead, behind, err := GetBranchInfo(dir)
 	if err != nil {
@@ -245,21 +249,27 @@ func TestGetBranchInfo(t *testing.T) {
 
 func TestGetRecentCommits(t *testing.T) {
 	dir := createTestRepo(t)
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Add more commits
 	for i := 0; i < 3; i++ {
 		testFile := filepath.Join(dir, "test.txt")
 		content := []byte("content " + string(rune('A'+i)))
-		os.WriteFile(testFile, content, 0644)
+		if err := os.WriteFile(testFile, content, 0o644); err != nil {
+			t.Fatalf("Failed to write test file: %v", err)
+		}
 
 		cmd := exec.Command("git", "add", ".")
 		cmd.Dir = dir
-		cmd.Run()
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to add files: %v", err)
+		}
 
 		cmd = exec.Command("git", "commit", "-m", "Commit "+string(rune('A'+i)))
 		cmd.Dir = dir
-		cmd.Run()
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to commit: %v", err)
+		}
 	}
 
 	commits, err := GetRecentCommits(dir, 2)
@@ -289,7 +299,7 @@ func TestGenerateAutoCommitMessage(t *testing.T) {
 func TestGetClaudeDir(t *testing.T) {
 	// Save original home
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
 
 	// Test with valid home
 	_, err := os.UserHomeDir()
@@ -302,12 +312,16 @@ func TestGetClaudeDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp home: %v", err)
 	}
-	defer os.RemoveAll(tmpHome)
+	defer func() { _ = os.RemoveAll(tmpHome) }()
 
 	claudeDir := filepath.Join(tmpHome, ".claude")
-	os.Mkdir(claudeDir, 0755)
+	if err := os.Mkdir(claudeDir, 0o755); err != nil {
+		t.Fatalf("Failed to create .claude dir: %v", err)
+	}
 
-	os.Setenv("HOME", tmpHome)
+	if err := os.Setenv("HOME", tmpHome); err != nil {
+		t.Fatalf("Failed to set HOME: %v", err)
+	}
 
 	dir, err := GetClaudeDir()
 	if err != nil {
@@ -319,7 +333,9 @@ func TestGetClaudeDir(t *testing.T) {
 	}
 
 	// Test with non-existent .claude directory
-	os.RemoveAll(claudeDir)
+	if err := os.RemoveAll(claudeDir); err != nil {
+		t.Fatalf("Failed to remove .claude dir: %v", err)
+	}
 	_, err = GetClaudeDir()
 	if err == nil {
 		t.Error("GetClaudeDir() should error when .claude doesn't exist")

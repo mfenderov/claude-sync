@@ -27,6 +27,7 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+// Execute runs the root command and handles errors
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
