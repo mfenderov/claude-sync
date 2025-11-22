@@ -6,6 +6,7 @@ import (
 
 	"github.com/mfenderov/claude-sync/internal/git"
 	"github.com/mfenderov/claude-sync/internal/logger"
+	"github.com/mfenderov/claude-sync/internal/prompts"
 	"github.com/mfenderov/claude-sync/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -40,12 +41,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Check if it's a git repo
+	// Check if it's a git repo - if not, run initialization flow
 	if !git.IsGitRepo(claudeDir) {
-		msg := "~/.claude is not a git repository"
-		log.Error("✗", msg, fmt.Errorf("not a git repo"), "directory", claudeDir)
-		log.Muted("  Run: cd ~/.claude && git init")
-		return fmt.Errorf("%s", msg)
+		return runInitFlow(log, claudeDir)
 	}
 
 	// Step 1: Check for local changes
@@ -89,6 +87,28 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Step 3: Pull with rebase
 	log.InfoMsg("⏳", "Pulling from remote (with rebase)...", "directory", claudeDir)
 	if err := git.PullWithRebase(claudeDir); err != nil {
+		// Check for conflicts
+		hasConflicts, conflictErr := git.HasConflicts(claudeDir)
+		if conflictErr == nil && hasConflicts {
+			log.Error("✗", "Merge conflicts detected!", err, "directory", claudeDir)
+			log.Warning("⚠️", "Conflicts found - aborting sync to keep your config safe")
+			log.Muted("  Please resolve conflicts manually and try again:")
+			log.Muted("  1. cd ~/.claude")
+			log.Muted("  2. Resolve conflicts in affected files")
+			log.Muted("  3. git add <resolved-files>")
+			log.Muted("  4. git rebase --continue")
+			log.Muted("  5. Run claude-sync again")
+			log.Newline()
+
+			// Abort the rebase to leave repo in clean state
+			if abortErr := git.AbortRebase(claudeDir); abortErr != nil {
+				log.Warning("⚠️", "Failed to abort rebase - manual intervention needed", "error", abortErr)
+			} else {
+				log.InfoMsg("ℹ️", "Rebase aborted - repository restored to previous state")
+			}
+			log.Newline()
+			return fmt.Errorf("merge conflicts detected - sync aborted")
+		}
 		log.Error("✗", "Failed to pull", err, "directory", claudeDir)
 		return err
 	}
@@ -116,6 +136,135 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Success("✨", "Sync complete!")
+	log.Newline()
+
+	return nil
+}
+
+// runInitFlow handles first-time setup when ~/.claude is not a git repo
+func runInitFlow(log *logger.Logger, claudeDir string) error {
+	log.Newline()
+	log.Title("🎉 First Time Setup")
+	log.InfoMsg("📋", "Claude Code configuration detected!", "directory", claudeDir)
+	log.Muted("  Let's set up git sync to keep your config synchronized across machines")
+	log.Newline()
+
+	// Step 1: Confirm user wants to proceed
+	confirmed, err := prompts.Confirm("🤔 Would you like to set up git sync now?")
+	if err != nil {
+		log.Error("✗", "Failed to read input", err)
+		return err
+	}
+
+	if !confirmed {
+		log.InfoMsg("ℹ️", "Setup cancelled - you can run claude-sync again when ready")
+		log.Newline()
+		return nil
+	}
+	log.Newline()
+
+	// Step 2: Get remote URL
+	log.InfoMsg("📦", "Please create a private git repository first")
+	log.Muted("  Examples:")
+	log.Muted("    • GitHub: https://github.com/new")
+	log.Muted("    • GitLab: https://gitlab.com/projects/new")
+	log.Muted("    • Bitbucket: https://bitbucket.org/repo/create")
+	log.Newline()
+
+	remoteURL, err := prompts.Input(
+		"🔗 Enter your git remote URL:",
+		"git@github.com:username/claude-config.git",
+	)
+	if err != nil {
+		log.Error("✗", "Failed to read input", err)
+		return err
+	}
+
+	if remoteURL == "" {
+		log.Error("✗", "No remote URL provided - setup cancelled", fmt.Errorf("empty remote URL"))
+		log.Newline()
+		return fmt.Errorf("setup cancelled")
+	}
+	log.Newline()
+
+	// Step 3: Validate remote exists
+	log.InfoMsg("⏳", "Validating remote repository...", "url", remoteURL)
+	if err := git.ValidateRemote(remoteURL); err != nil {
+		log.Error("✗", "Remote repository not accessible", err, "url", remoteURL)
+		log.Newline()
+		log.Warning("⚠️", "Please make sure:")
+		log.Muted("  1. The repository exists and you have access")
+		log.Muted("  2. You have SSH keys set up (for git@ URLs)")
+		log.Muted("  3. The URL is correct")
+		log.Newline()
+		log.InfoMsg("💡", "After creating the repo, run claude-sync again")
+		log.Newline()
+		return fmt.Errorf("remote repository not accessible")
+	}
+	log.Success("✓", "Remote repository verified!", "url", remoteURL)
+	log.Newline()
+
+	// Step 4: Initialize git repo
+	log.InfoMsg("⏳", "Initializing git repository...", "directory", claudeDir)
+	if err := git.InitRepo(claudeDir); err != nil {
+		log.Error("✗", "Failed to initialize git repo", err, "directory", claudeDir)
+		return err
+	}
+	log.Success("✓", "Git repository initialized")
+	log.Newline()
+
+	// Step 5: Create .gitignore
+	log.InfoMsg("⏳", "Creating .gitignore for sensitive files...")
+	if err := git.SetupGitignore(claudeDir); err != nil {
+		log.Error("✗", "Failed to create .gitignore", err, "directory", claudeDir)
+		return err
+	}
+	log.Success("✓", ".gitignore created")
+	log.Muted("  Excluded: credentials.json, *.key, aws-*.sh, .env, etc.")
+	log.Newline()
+
+	// Step 6: Initial commit
+	log.InfoMsg("⏳", "Creating initial commit...")
+	if err := git.InitialCommit(claudeDir, "Initial Claude Code configuration"); err != nil {
+		log.Error("✗", "Failed to create initial commit", err, "directory", claudeDir)
+		return err
+	}
+	log.Success("✓", "Initial commit created")
+	log.Newline()
+
+	// Step 7: Add remote
+	log.InfoMsg("⏳", "Adding remote repository...", "url", remoteURL)
+	if err := git.AddRemote(claudeDir, "origin", remoteURL); err != nil {
+		log.Error("✗", "Failed to add remote", err, "url", remoteURL)
+		return err
+	}
+	log.Success("✓", "Remote added", "name", "origin", "url", remoteURL)
+	log.Newline()
+
+	// Step 8: Push to remote
+	log.InfoMsg("⏳", "Pushing to remote...")
+	// Use push with -u to set upstream
+	if err := git.Push(claudeDir); err != nil {
+		log.Error("✗", "Failed to push", err)
+		log.Newline()
+		log.Warning("⚠️", "Git setup complete, but push failed")
+		log.Muted("  Your config is initialized locally. Try:")
+		log.Muted("  1. cd ~/.claude")
+		log.Muted("  2. git push -u origin main")
+		log.Muted("  3. Run claude-sync again")
+		log.Newline()
+		return err
+	}
+	log.Success("✓", "Pushed to remote")
+	log.Newline()
+
+	// Success!
+	log.Success("🎉", "Setup complete!")
+	log.InfoMsg("💡", "Your Claude Code config is now synced!")
+	log.Muted("  Next steps:")
+	log.Muted("  • Make changes to your Claude config")
+	log.Muted("  • Run 'claude-sync' to automatically sync")
+	log.Muted("  • On other machines: git clone your repo to ~/.claude")
 	log.Newline()
 
 	return nil

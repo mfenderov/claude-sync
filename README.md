@@ -12,50 +12,58 @@ Built with ❤️ using Go and [Charm](https://charm.sh/) libraries.
 
 ## ✨ Features
 
-- **Automatic Sync**: One command to commit, pull (with rebase), and push
-- **Beautiful TUI**: Gorgeous terminal UI powered by Lipgloss
-- **Smart Commits**: Auto-generated commit messages with timestamps
+- **Zero-Config Setup**: Interactive first-time setup - just run `claude-sync`!
+- **Smart Sync**: Automatically detects changes, commits, pulls, and pushes
+- **Beautiful TUI**: Gorgeous terminal UI with emojis and colors powered by Lipgloss
+- **Conflict Protection**: Safely detects and aborts on merge conflicts to protect your config
+- **Auto .gitignore**: Automatically excludes sensitive files (credentials, keys, AWS scripts)
+- **Remote Validation**: Checks if your git repository exists before setup
 - **Status Dashboard**: View your config status with plugins, hooks, and skills
-- **Git Integration**: Built-in git operations for seamless syncing
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### From Source
+### Installation
 
 ```bash
 go install github.com/mfenderov/claude-sync@latest
 ```
 
-### Build Locally
+### First Time Setup
 
-```bash
-git clone https://github.com/mfenderov/claude-sync.git
-cd claude-sync
-go build -o claude-sync
-go install
-```
-
-## 📖 Usage
-
-### Sync Configuration
-
-The main command automatically syncs your Claude Code config:
+Just run `claude-sync` and it will guide you through an interactive setup:
 
 ```bash
 claude-sync
-# or
-claude-sync sync
 ```
 
-This will:
-1. ✅ Detect and commit local changes
-2. ✅ Pull from remote (with rebase)
-3. ✅ Push to remote
-4. ✅ Show recent activity
+That's it! The tool will:
+1. 🔍 Detect your Claude Code configuration
+2. 🎯 Prompt you to create a private git repository
+3. ✨ Initialize git, create .gitignore, and push to remote
+4. 🎉 Your config is now synced!
+
+No manual git setup required - it just works!
+
+## 📖 Usage
+
+### Daily Workflow
+
+After the initial setup, just run `claude-sync` whenever you want to sync:
+
+```bash
+claude-sync
+```
+
+This automatically:
+1. ✅ Detects and commits local changes
+2. ✅ Pulls from remote (with rebase)
+3. ✅ Pushes to remote
+4. ✅ Shows recent activity
+5. ⚠️ Safely aborts on conflicts to protect your config
 
 ### View Status
 
-See your current configuration status:
+Check your configuration status:
 
 ```bash
 claude-sync status
@@ -67,6 +75,18 @@ Displays:
 - Enabled plugins
 - Installed hooks
 - Available skills
+
+### On Other Machines
+
+1. Clone your config repo:
+```bash
+git clone git@github.com:yourusername/claude-config.git ~/.claude
+```
+
+2. Run `claude-sync` to keep it synced:
+```bash
+claude-sync
+```
 
 ## 🎨 What It Looks Like
 
@@ -127,46 +147,56 @@ claude-sync/
 - Go 1.21+
 - Git
 - Claude Code with config in `~/.claude`
-
-## 📋 Prerequisites
-
-Your `~/.claude` directory must be a git repository:
-
-```bash
-cd ~/.claude
-git init
-git remote add origin git@github.com:yourusername/claude-config.git
-```
+- A git hosting service account (GitHub, GitLab, Bitbucket, etc.)
 
 ## 🎯 Use Cases
 
-### Daily Workflow
+### First Time Setup
 ```bash
-# Morning on Machine A: make changes
-vim ~/.claude/settings.json
-
-# Sync to GitHub
+# Just run it - interactive setup walks you through everything!
 claude-sync
 
-# Switch to Machine B
+# It will:
+# - Detect your Claude Code config
+# - Ask for your git repository URL
+# - Validate the repository exists
+# - Initialize git with smart .gitignore
+# - Push to remote
+```
+
+### Daily Workflow on Machine A
+```bash
+# Make changes to your Claude config
+vim ~/.claude/settings.json
+
+# Sync to GitHub - one command!
+claude-sync
+```
+
+### Sync on Machine B
+```bash
+# First time: clone the repo
+git clone git@github.com:yourusername/claude-config.git ~/.claude
+
+# Then just sync whenever you want
 claude-sync  # Automatically pulls latest changes
 ```
 
-### Check Status Before Syncing
+### Check Status Anytime
 ```bash
-claude-sync status  # See what will be synced
-claude-sync          # Sync it!
+claude-sync status  # See repo info, plugins, hooks, skills
 ```
 
 ## 🔮 Future Features
 
-- [ ] Interactive mode with menu navigation
 - [ ] Diff viewer for uncommitted changes
 - [ ] Backup/restore functionality
 - [ ] Profile management (work/personal)
 - [ ] Selective sync (hooks only, plugins only, etc.)
-- [ ] Config validation
-- [ ] Remote config templates
+- [ ] Config validation before sync
+- [ ] Remote config templates/presets
+- [ ] Automatic conflict resolution for specific file types
+- [ ] Sync history and rollback
 
 ## 🛠 Development
 

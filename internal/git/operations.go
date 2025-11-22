@@ -156,3 +156,110 @@ func IsGitRepo(repoPath string) bool {
 	}
 	return info.IsDir()
 }
+
+// InitRepo initializes a new git repository
+func InitRepo(repoPath string) error {
+	cmd := exec.Command("git", "-C", repoPath, "init")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to initialize git repo: %w", err)
+	}
+	return nil
+}
+
+// ValidateRemote checks if a remote repository exists and is accessible
+func ValidateRemote(remoteURL string) error {
+	cmd := exec.Command("git", "ls-remote", remoteURL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("remote repository not accessible: %w\nOutput: %s", err, string(output))
+	}
+	return nil
+}
+
+// AddRemote adds a remote repository
+func AddRemote(repoPath, name, url string) error {
+	cmd := exec.Command("git", "-C", repoPath, "remote", "add", name, url)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to add remote: %w", err)
+	}
+	return nil
+}
+
+// InitialCommit creates the initial commit with all files
+func InitialCommit(repoPath, message string) error {
+	// Stage all files
+	cmd := exec.Command("git", "-C", repoPath, "add", ".")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to stage files: %w", err)
+	}
+
+	// Commit
+	cmd = exec.Command("git", "-C", repoPath, "commit", "-m", message)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to create initial commit: %w", err)
+	}
+
+	return nil
+}
+
+// SetupGitignore creates a .gitignore file with sensible defaults
+func SetupGitignore(repoPath string) error {
+	gitignoreContent := `# Credentials and secrets
+credentials.json
+*.key
+*.pem
+*.p12
+*-key.json
+service-account*.json
+
+# AWS scripts (may contain credentials)
+aws-*.sh
+
+# Environment files
+.env
+.env.*
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+`
+
+	gitignorePath := filepath.Join(repoPath, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+		return fmt.Errorf("failed to create .gitignore: %w", err)
+	}
+
+	return nil
+}
+
+// HasConflicts checks if there are merge conflicts
+func HasConflicts(repoPath string) (bool, error) {
+	// Check for unmerged paths
+	cmd := exec.Command("git", "-C", repoPath, "diff", "--name-only", "--diff-filter=U")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check for conflicts: %w", err)
+	}
+
+	conflicts := strings.TrimSpace(string(output))
+	return conflicts != "", nil
+}
+
+// AbortRebase aborts an ongoing rebase
+func AbortRebase(repoPath string) error {
+	cmd := exec.Command("git", "-C", repoPath, "rebase", "--abort")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to abort rebase: %w", err)
+	}
+	return nil
+}
