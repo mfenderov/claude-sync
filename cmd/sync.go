@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -32,6 +33,7 @@ func init() {
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	log := logger.Default()
 	log.Title("🎭 Claude Config Sync")
 
@@ -44,26 +46,26 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	// Check if it's a git repo - if not, run initialization flow
 	if !git.IsGitRepo(claudeDir) {
-		return runInitFlow(log, claudeDir)
+		return runInitFlow(ctx, log, claudeDir)
 	}
 
 	// Step 1: Commit local changes if any
-	if err := commitLocalChanges(log, claudeDir); err != nil {
+	if err := commitLocalChanges(ctx, log, claudeDir); err != nil {
 		return err
 	}
 
 	// Step 2: Pull with rebase
-	if err := pullWithRebaseAndHandleConflicts(log, claudeDir); err != nil {
+	if err := pullWithRebaseAndHandleConflicts(ctx, log, claudeDir); err != nil {
 		return err
 	}
 
 	// Step 3: Push to remote
-	if err := pushToRemote(log, claudeDir); err != nil {
+	if err := pushToRemote(ctx, log, claudeDir); err != nil {
 		return err
 	}
 
 	// Show recent activity
-	showRecentActivity(log, claudeDir)
+	showRecentActivity(ctx, log, claudeDir)
 
 	log.Success("✨", "Sync complete!")
 	log.Newline()
@@ -71,9 +73,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func commitLocalChanges(log *logger.Logger, claudeDir string) error {
+func commitLocalChanges(ctx context.Context, log *logger.Logger, claudeDir string) error {
 	log.InfoMsg("⏳", "Checking for local changes...", "directory", claudeDir)
-	hasChanges, err := git.HasUncommittedChanges(claudeDir)
+	hasChanges, err := git.HasUncommittedChanges(ctx, claudeDir)
 	if err != nil {
 		log.Error("✗", "Failed to check changes", err, "directory", claudeDir)
 		return err
@@ -86,7 +88,7 @@ func commitLocalChanges(log *logger.Logger, claudeDir string) error {
 	}
 
 	// Get changed files
-	changedFiles, err := git.GetChangedFiles(claudeDir)
+	changedFiles, err := git.GetChangedFiles(ctx, claudeDir)
 	if err != nil {
 		log.Error("✗", "Failed to get changed files", err, "directory", claudeDir)
 		return err
@@ -102,7 +104,7 @@ func commitLocalChanges(log *logger.Logger, claudeDir string) error {
 	// Commit changes
 	commitMsg := git.GenerateAutoCommitMessage()
 	log.InfoMsg("⏳", "Committing changes...", "message", commitMsg)
-	if err := git.CommitChanges(claudeDir, commitMsg); err != nil {
+	if err := git.CommitChanges(ctx, claudeDir, commitMsg); err != nil {
 		log.Error("✗", "Failed to commit", err, "directory", claudeDir)
 		return err
 	}
@@ -112,19 +114,19 @@ func commitLocalChanges(log *logger.Logger, claudeDir string) error {
 	return nil
 }
 
-func pullWithRebaseAndHandleConflicts(log *logger.Logger, claudeDir string) error {
+func pullWithRebaseAndHandleConflicts(ctx context.Context, log *logger.Logger, claudeDir string) error {
 	log.InfoMsg("⏳", "Pulling from remote (with rebase)...", "directory", claudeDir)
-	if err := git.PullWithRebase(claudeDir); err != nil {
-		return handlePullError(log, claudeDir, err)
+	if err := git.PullWithRebase(ctx, claudeDir); err != nil {
+		return handlePullError(ctx, log, claudeDir, err)
 	}
 	log.Success("✓", "Pulled latest changes")
 	log.Newline()
 	return nil
 }
 
-func handlePullError(log *logger.Logger, claudeDir string, pullErr error) error {
+func handlePullError(ctx context.Context, log *logger.Logger, claudeDir string, pullErr error) error {
 	// Check for conflicts
-	hasConflicts, conflictErr := git.HasConflicts(claudeDir)
+	hasConflicts, conflictErr := git.HasConflicts(ctx, claudeDir)
 	if conflictErr != nil || !hasConflicts {
 		log.Error("✗", "Failed to pull", pullErr, "directory", claudeDir)
 		return pullErr
@@ -142,7 +144,7 @@ func handlePullError(log *logger.Logger, claudeDir string, pullErr error) error 
 	log.Newline()
 
 	// Abort the rebase to leave repo in clean state
-	if abortErr := git.AbortRebase(claudeDir); abortErr != nil {
+	if abortErr := git.AbortRebase(ctx, claudeDir); abortErr != nil {
 		log.Warning("⚠️", "Failed to abort rebase - manual intervention needed", "error", abortErr)
 	} else {
 		log.InfoMsg("ℹ️", "Rebase aborted - repository restored to previous state")
@@ -151,9 +153,9 @@ func handlePullError(log *logger.Logger, claudeDir string, pullErr error) error 
 	return fmt.Errorf("merge conflicts detected - sync aborted")
 }
 
-func pushToRemote(log *logger.Logger, claudeDir string) error {
+func pushToRemote(ctx context.Context, log *logger.Logger, claudeDir string) error {
 	log.InfoMsg("⏳", "Pushing to remote...", "directory", claudeDir)
-	if err := git.Push(claudeDir); err != nil {
+	if err := git.Push(ctx, claudeDir); err != nil {
 		log.Error("✗", "Failed to push", err, "directory", claudeDir)
 		return err
 	}
@@ -162,8 +164,8 @@ func pushToRemote(log *logger.Logger, claudeDir string) error {
 	return nil
 }
 
-func showRecentActivity(log *logger.Logger, claudeDir string) {
-	commits, err := git.GetRecentCommits(claudeDir, 5)
+func showRecentActivity(ctx context.Context, log *logger.Logger, claudeDir string) {
+	commits, err := git.GetRecentCommits(ctx, claudeDir, 5)
 	if err != nil || len(commits) == 0 {
 		return
 	}
@@ -176,7 +178,7 @@ func showRecentActivity(log *logger.Logger, claudeDir string) {
 }
 
 // runInitFlow handles first-time setup when ~/.claude is not a git repo
-func runInitFlow(log *logger.Logger, claudeDir string) error {
+func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) error {
 	log.Newline()
 	log.Title("🎉 First Time Setup")
 	log.InfoMsg("📋", "Claude Code configuration detected!", "directory", claudeDir)
@@ -223,7 +225,7 @@ func runInitFlow(log *logger.Logger, claudeDir string) error {
 
 	// Step 3: Validate remote exists
 	log.InfoMsg("⏳", "Validating remote repository...", "url", remoteURL)
-	if err := git.ValidateRemote(remoteURL); err != nil {
+	if err := git.ValidateRemote(ctx, remoteURL); err != nil {
 		log.Error("✗", "Remote repository not accessible", err, "url", remoteURL)
 		log.Newline()
 		log.Warning("⚠️", "Please make sure:")
@@ -240,7 +242,7 @@ func runInitFlow(log *logger.Logger, claudeDir string) error {
 
 	// Step 4: Initialize git repo
 	log.InfoMsg("⏳", "Initializing git repository...", "directory", claudeDir)
-	if err := git.InitRepo(claudeDir); err != nil {
+	if err := git.InitRepo(ctx, claudeDir); err != nil {
 		log.Error("✗", "Failed to initialize git repo", err, "directory", claudeDir)
 		return err
 	}
@@ -259,7 +261,7 @@ func runInitFlow(log *logger.Logger, claudeDir string) error {
 
 	// Step 6: Initial commit
 	log.InfoMsg("⏳", "Creating initial commit...")
-	if err := git.InitialCommit(claudeDir, "Initial Claude Code configuration"); err != nil {
+	if err := git.InitialCommit(ctx, claudeDir, "Initial Claude Code configuration"); err != nil {
 		log.Error("✗", "Failed to create initial commit", err, "directory", claudeDir)
 		return err
 	}
@@ -268,7 +270,7 @@ func runInitFlow(log *logger.Logger, claudeDir string) error {
 
 	// Step 7: Add remote
 	log.InfoMsg("⏳", "Adding remote repository...", "url", remoteURL)
-	if err := git.AddRemote(claudeDir, "origin", remoteURL); err != nil {
+	if err := git.AddRemote(ctx, claudeDir, "origin", remoteURL); err != nil {
 		log.Error("✗", "Failed to add remote", err, "url", remoteURL)
 		return err
 	}
@@ -278,7 +280,7 @@ func runInitFlow(log *logger.Logger, claudeDir string) error {
 	// Step 8: Push to remote
 	log.InfoMsg("⏳", "Pushing to remote...")
 	// Use push with -u to set upstream
-	if err := git.Push(claudeDir); err != nil {
+	if err := git.Push(ctx, claudeDir); err != nil {
 		log.Error("✗", "Failed to push", err)
 		log.Newline()
 		log.Warning("⚠️", "Git setup complete, but push failed")

@@ -1,11 +1,15 @@
 package git
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
+
+// Ensure context is recognized as used at package level
+var _ = context.Background
 
 // Helper function to create a test git repository
 func createTestRepo(t *testing.T) string {
@@ -144,7 +148,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 
 			tt.setup(dir)
 
-			hasChanges, err := HasUncommittedChanges(dir)
+			hasChanges, err := HasUncommittedChanges(t.Context(), dir)
 			if err != nil {
 				t.Fatalf("HasUncommittedChanges() error = %v", err)
 			}
@@ -157,11 +161,12 @@ func TestHasUncommittedChanges(t *testing.T) {
 }
 
 func TestGetChangedFiles(t *testing.T) {
+	ctx := t.Context()
 	dir := createTestRepo(t)
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Test with no changes
-	files, err := GetChangedFiles(dir)
+	files, err := GetChangedFiles(ctx, dir)
 	if err != nil {
 		t.Fatalf("GetChangedFiles() error = %v", err)
 	}
@@ -175,7 +180,7 @@ func TestGetChangedFiles(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	files, err = GetChangedFiles(dir)
+	files, err = GetChangedFiles(ctx, dir)
 	if err != nil {
 		t.Fatalf("GetChangedFiles() error = %v", err)
 	}
@@ -188,6 +193,7 @@ func TestGetChangedFiles(t *testing.T) {
 }
 
 func TestCommitChanges(t *testing.T) {
+	ctx := t.Context()
 	dir := createTestRepo(t)
 	defer func() { _ = os.RemoveAll(dir) }()
 
@@ -199,13 +205,13 @@ func TestCommitChanges(t *testing.T) {
 
 	// Commit the changes
 	commitMsg := "Test commit"
-	err := CommitChanges(dir, commitMsg)
+	err := CommitChanges(ctx, dir, commitMsg)
 	if err != nil {
 		t.Fatalf("CommitChanges() error = %v", err)
 	}
 
 	// Verify no uncommitted changes remain
-	hasChanges, err := HasUncommittedChanges(dir)
+	hasChanges, err := HasUncommittedChanges(ctx, dir)
 	if err != nil {
 		t.Fatalf("HasUncommittedChanges() error = %v", err)
 	}
@@ -228,10 +234,11 @@ func TestCommitChanges(t *testing.T) {
 }
 
 func TestGetBranchInfo(t *testing.T) {
+	ctx := t.Context()
 	dir := createTestRepo(t)
 	defer func() { _ = os.RemoveAll(dir) }()
 
-	branch, ahead, behind, err := GetBranchInfo(dir)
+	branch, ahead, behind, err := GetBranchInfo(ctx, dir)
 	if err != nil {
 		t.Fatalf("GetBranchInfo() error = %v", err)
 	}
@@ -248,6 +255,7 @@ func TestGetBranchInfo(t *testing.T) {
 }
 
 func TestGetRecentCommits(t *testing.T) {
+	ctx := t.Context()
 	dir := createTestRepo(t)
 	defer func() { _ = os.RemoveAll(dir) }()
 
@@ -272,7 +280,7 @@ func TestGetRecentCommits(t *testing.T) {
 		}
 	}
 
-	commits, err := GetRecentCommits(dir, 2)
+	commits, err := GetRecentCommits(ctx, dir, 2)
 	if err != nil {
 		t.Fatalf("GetRecentCommits() error = %v", err)
 	}

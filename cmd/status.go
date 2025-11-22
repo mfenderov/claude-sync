@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -27,6 +28,7 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 	log := logger.Default()
 	log.Title("📊 Configuration Status")
 
@@ -45,7 +47,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get and display branch info
-	branch, ahead, behind, err := git.GetBranchInfo(claudeDir)
+	branch, ahead, behind, err := git.GetBranchInfo(ctx, claudeDir)
 	if err != nil {
 		fmt.Println(ui.RenderError("✗", "Failed to get branch info"))
 		return err
@@ -53,7 +55,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	displayRepositoryInfo(claudeDir, branch, ahead, behind, log)
 
 	// Display modified files if any
-	displayModifiedFiles(claudeDir, log)
+	displayModifiedFiles(ctx, claudeDir, log)
 
 	// Display plugins, hooks, and skills
 	displayPlugins(claudeDir, log)
@@ -97,8 +99,8 @@ func formatBranchInfo(branch string, ahead, behind int) string {
 	return branchInfo
 }
 
-func displayModifiedFiles(claudeDir string, log *logger.Logger) {
-	hasChanges, err := git.HasUncommittedChanges(claudeDir)
+func displayModifiedFiles(ctx context.Context, claudeDir string, log *logger.Logger) {
+	hasChanges, err := git.HasUncommittedChanges(ctx, claudeDir)
 	if err != nil {
 		log.Warning("⚠️", "Could not check for uncommitted changes", "error", err)
 		return
@@ -108,7 +110,7 @@ func displayModifiedFiles(claudeDir string, log *logger.Logger) {
 		return
 	}
 
-	changedFiles, err := git.GetChangedFiles(claudeDir)
+	changedFiles, err := git.GetChangedFiles(ctx, claudeDir)
 	if err != nil {
 		log.Warning("⚠️", "Could not get changed files", "error", err)
 		return
