@@ -29,13 +29,21 @@ const claudeDir = ".claude"
 func GetClaudeDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
+		return "", &DirectoryError{
+			Path: "~",
+			Op:   "get home directory",
+			Err:  err,
+		}
 	}
 	claudePath := filepath.Join(home, claudeDir)
 
 	// Check if directory exists
 	if _, err := os.Stat(claudePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("~/.claude directory not found")
+		return "", &DirectoryError{
+			Path: claudePath,
+			Op:   "access",
+			Err:  err,
+		}
 	}
 
 	return claudePath, nil
@@ -52,7 +60,11 @@ func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
 				return true, nil
 			}
 		}
-		return false, fmt.Errorf("failed to check git status: %w", err)
+		return false, &GitOperationError{
+			Op:   "diff-index",
+			Path: repoPath,
+			Err:  err,
+		}
 	}
 	return false, nil
 }
@@ -189,7 +201,11 @@ func ValidateRemote(ctx context.Context, remoteURL string) error {
 	cmd := exec.CommandContext(ctx, "git", "ls-remote", remoteURL)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("remote repository not accessible: %w\nOutput: %s", err, string(output))
+		return &RemoteError{
+			URL: remoteURL,
+			Op:  "validate",
+			Err: fmt.Errorf("%w: %s", err, string(output)),
+		}
 	}
 	return nil
 }
@@ -266,7 +282,11 @@ func HasConflicts(ctx context.Context, repoPath string) (bool, error) {
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--name-only", "--diff-filter=U")
 	output, err := cmd.Output()
 	if err != nil {
-		return false, fmt.Errorf("failed to check for conflicts: %w", err)
+		return false, &GitOperationError{
+			Op:   "check conflicts",
+			Path: repoPath,
+			Err:  err,
+		}
 	}
 
 	conflicts := strings.TrimSpace(string(output))
