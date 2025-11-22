@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/mfenderov/claude-sync/internal/git"
+	"github.com/mfenderov/claude-sync/internal/logger"
 	"github.com/mfenderov/claude-sync/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -29,30 +30,29 @@ func init() {
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
-	fmt.Println()
-	fmt.Println(ui.TitleStyle.Render("🎭 Claude Config Sync"))
-	fmt.Println()
+	log := logger.Default()
+	log.Title("🎭 Claude Config Sync")
 
 	// Get Claude directory
 	claudeDir, err := git.GetClaudeDir()
 	if err != nil {
-		fmt.Println(ui.RenderError("✗", err.Error()))
+		log.Error("✗", err.Error(), err, "directory", "~/.claude")
 		return err
 	}
 
 	// Check if it's a git repo
 	if !git.IsGitRepo(claudeDir) {
 		msg := "~/.claude is not a git repository"
-		fmt.Println(ui.RenderError("✗", msg))
-		fmt.Println(ui.RenderMuted("  Run: cd ~/.claude && git init"))
+		log.Error("✗", msg, fmt.Errorf("not a git repo"), "directory", claudeDir)
+		log.Muted("  Run: cd ~/.claude && git init")
 		return fmt.Errorf("%s", msg)
 	}
 
 	// Step 1: Check for local changes
-	fmt.Println(ui.RenderInfo("⏳", "Checking for local changes..."))
+	log.InfoMsg("⏳", "Checking for local changes...", "directory", claudeDir)
 	hasChanges, err := git.HasUncommittedChanges(claudeDir)
 	if err != nil {
-		fmt.Println(ui.RenderError("✗", "Failed to check changes"))
+		log.Error("✗", "Failed to check changes", err, "directory", claudeDir)
 		return err
 	}
 
@@ -60,48 +60,49 @@ func runSync(cmd *cobra.Command, args []string) error {
 		// Get changed files
 		changedFiles, err := git.GetChangedFiles(claudeDir)
 		if err != nil {
-			fmt.Println(ui.RenderError("✗", "Failed to get changed files"))
+			log.Error("✗", "Failed to get changed files", err, "directory", claudeDir)
 			return err
 		}
 
-		fmt.Println(ui.RenderSuccess("✓", fmt.Sprintf("Found %d changed file(s)", len(changedFiles))))
+		log.Success("✓", fmt.Sprintf("Found %d changed file(s)", len(changedFiles)),
+			"count", len(changedFiles), "files", changedFiles)
 		for _, file := range changedFiles {
-			fmt.Println(ui.ListItemStyle.Render("→ " + file))
+			log.ListItem("→ " + file)
 		}
-		fmt.Println()
+		log.Newline()
 
 		// Step 2: Commit changes
 		commitMsg := git.GenerateAutoCommitMessage()
-		fmt.Println(ui.RenderInfo("⏳", "Committing changes..."))
+		log.InfoMsg("⏳", "Committing changes...", "message", commitMsg)
 		if err := git.CommitChanges(claudeDir, commitMsg); err != nil {
-			fmt.Println(ui.RenderError("✗", "Failed to commit"))
+			log.Error("✗", "Failed to commit", err, "directory", claudeDir)
 			return err
 		}
-		fmt.Println(ui.RenderSuccess("✓", "Changes committed"))
-		fmt.Println(ui.RenderMuted("  " + commitMsg))
-		fmt.Println()
+		log.Success("✓", "Changes committed", "message", commitMsg)
+		log.Muted("  " + commitMsg)
+		log.Newline()
 	} else {
-		fmt.Println(ui.RenderSuccess("✓", "No local changes"))
-		fmt.Println()
+		log.Success("✓", "No local changes")
+		log.Newline()
 	}
 
 	// Step 3: Pull with rebase
-	fmt.Println(ui.RenderInfo("⏳", "Pulling from remote (with rebase)..."))
+	log.InfoMsg("⏳", "Pulling from remote (with rebase)...", "directory", claudeDir)
 	if err := git.PullWithRebase(claudeDir); err != nil {
-		fmt.Println(ui.RenderError("✗", "Failed to pull"))
+		log.Error("✗", "Failed to pull", err, "directory", claudeDir)
 		return err
 	}
-	fmt.Println(ui.RenderSuccess("✓", "Pulled latest changes"))
-	fmt.Println()
+	log.Success("✓", "Pulled latest changes")
+	log.Newline()
 
 	// Step 4: Push
-	fmt.Println(ui.RenderInfo("⏳", "Pushing to remote..."))
+	log.InfoMsg("⏳", "Pushing to remote...", "directory", claudeDir)
 	if err := git.Push(claudeDir); err != nil {
-		fmt.Println(ui.RenderError("✗", "Failed to push"))
+		log.Error("✗", "Failed to push", err, "directory", claudeDir)
 		return err
 	}
-	fmt.Println(ui.RenderSuccess("✓", "Pushed to remote"))
-	fmt.Println()
+	log.Success("✓", "Pushed to remote")
+	log.Newline()
 
 	// Show recent commits
 	commits, err := git.GetRecentCommits(claudeDir, 5)
@@ -111,12 +112,11 @@ func runSync(cmd *cobra.Command, args []string) error {
 			commitList.WriteString(ui.ListItemStyle.Render(commit) + "\n")
 		}
 
-		box := ui.RenderBox("Recent Activity", commitList.String())
-		fmt.Println(box)
+		log.Box("Recent Activity", commitList.String())
 	}
 
-	fmt.Println(ui.RenderSuccess("✨", "Sync complete!"))
-	fmt.Println()
+	log.Success("✨", "Sync complete!")
+	log.Newline()
 
 	return nil
 }

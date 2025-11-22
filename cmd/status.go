@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mfenderov/claude-sync/internal/git"
+	"github.com/mfenderov/claude-sync/internal/logger"
 	"github.com/mfenderov/claude-sync/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -25,21 +26,20 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	fmt.Println()
-	fmt.Println(ui.TitleStyle.Render("📊 Configuration Status"))
-	fmt.Println()
+	log := logger.Default()
+	log.Title("📊 Configuration Status")
 
 	// Get Claude directory
 	claudeDir, err := git.GetClaudeDir()
 	if err != nil {
-		fmt.Println(ui.RenderError("✗", err.Error()))
+		log.Error("✗", err.Error(), err, "directory", "~/.claude")
 		return err
 	}
 
 	// Check if it's a git repo
 	if !git.IsGitRepo(claudeDir) {
 		msg := "~/.claude is not a git repository"
-		fmt.Println(ui.RenderError("✗", msg))
+		log.Error("✗", msg, fmt.Errorf("not a git repo"), "directory", claudeDir)
 		return fmt.Errorf("%s", msg)
 	}
 
@@ -78,6 +78,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	repoInfo.WriteString(ui.InfoStyle.Render(branchInfo))
 
 	fmt.Println(ui.BoxStyle.Render(repoInfo.String()))
+	log.Info("Repository status", "branch", branch, "ahead", ahead, "behind", behind, "remote", remoteURL)
 
 	// Check for uncommitted changes
 	hasChanges, _ := git.HasUncommittedChanges(claudeDir)
@@ -89,6 +90,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			changeInfo.WriteString(ui.ListItemStyle.Render("• " + file) + "\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(changeInfo.String()))
+		log.Warn("Uncommitted changes detected", "count", len(changedFiles), "files", changedFiles)
 	}
 
 	// Show plugins
@@ -100,6 +102,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			pluginInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓")+" "+plugin) + "\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(pluginInfo.String()))
+		log.Info("Enabled plugins", "count", len(plugins), "plugins", plugins)
 	}
 
 	// Show hooks
@@ -111,6 +114,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			hookInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓")+" "+hook) + "\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(hookInfo.String()))
+		log.Info("Installed hooks", "count", len(hooks), "hooks", hooks)
 	}
 
 	// Show skills
@@ -122,9 +126,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 			skillInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓")+" "+skill) + "\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(skillInfo.String()))
+		log.Info("Loaded skills", "count", len(skills), "skills", skills)
 	}
 
-	fmt.Println()
+	log.Newline()
 	return nil
 }
 
