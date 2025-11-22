@@ -60,7 +60,7 @@ tasks:
     cmds:
       - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
       - go tool cover -html=coverage.txt -o coverage.html
-      - echo "Coverage report generated: coverage.html"
+      - echo "Coverage report generated in coverage.html"
 
   lint:
     desc: Run linter
@@ -119,10 +119,3 @@ tasks:
     desc: Run in development mode (build + run)
     cmds:
       - go run -ldflags "{{.LDFLAGS}}" {{.MAIN_PACKAGE}} {{.CLI_ARGS}}
-
-  version:
-    desc: Show version information
-    cmds:
-      - echo "Version:    {{.GIT_TAG}}"
-      - echo "Commit:     {{.GIT_COMMIT}}"
-      - echo "Build Date: {{.BUILD_DATE}}"
