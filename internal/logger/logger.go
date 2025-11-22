@@ -1,3 +1,8 @@
+// Package logger provides a beautiful structured logging wrapper around slog.
+//
+// This package combines structured logging capabilities with beautiful terminal
+// output using Lipgloss styling. It's designed for CLI applications that need
+// both human-readable terminal output and machine-parsable structured logs.
 package logger
 
 import (

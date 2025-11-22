@@ -1,3 +1,8 @@
+// Package ui provides terminal styling and rendering using Lipgloss.
+//
+// This package defines the color palette, styles, and helper functions for
+// creating beautiful terminal output with consistent styling throughout the
+// claude-sync CLI.
 package ui
 
 import (

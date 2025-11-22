@@ -1,3 +1,6 @@
+// Package prompts provides interactive terminal prompts for user input.
+// It includes confirmation dialogs and text input fields using the
+// Bubble Tea framework for a beautiful TUI experience.
 package prompts
 
 import (
@@ -9,20 +12,20 @@ import (
 	"github.com/mfenderov/claude-sync/internal/ui"
 )
 
-// ConfirmModel is a model for yes/no confirmation prompts
-type ConfirmModel struct {
+// confirmModel is a model for yes/no confirmation prompts
+type confirmModel struct {
 	prompt   string
 	response bool
 	done     bool
 }
 
 // Init implements tea.Model
-func (m ConfirmModel) Init() tea.Cmd {
+func (m confirmModel) Init() tea.Cmd {
 	return nil
 }
 
 // Update implements tea.Model
-func (m ConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m confirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -44,7 +47,7 @@ func (m ConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model
-func (m ConfirmModel) View() string {
+func (m confirmModel) View() string {
 	if m.done {
 		return ""
 	}
@@ -53,29 +56,34 @@ func (m ConfirmModel) View() string {
 
 // Confirm prompts the user for a yes/no confirmation
 func Confirm(prompt string) (bool, error) {
-	m := ConfirmModel{prompt: prompt}
+	m := confirmModel{prompt: prompt}
 	p := tea.NewProgram(m)
 	finalModel, err := p.Run()
 	if err != nil {
 		return false, err
 	}
-	return finalModel.(ConfirmModel).response, nil
+
+	finalConfirm, ok := finalModel.(confirmModel)
+	if !ok {
+		return false, fmt.Errorf("unexpected model type: %T", finalModel)
+	}
+	return finalConfirm.response, nil
 }
 
-// InputModel is a model for text input prompts
-type InputModel struct {
+// inputModel is a model for text input prompts
+type inputModel struct {
 	textInput textinput.Model
 	prompt    string
 	done      bool
 }
 
 // Init implements tea.Model
-func (m InputModel) Init() tea.Cmd {
+func (m inputModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
 // Update implements tea.Model
-func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m inputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -96,7 +104,7 @@ func (m InputModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View implements tea.Model
-func (m InputModel) View() string {
+func (m inputModel) View() string {
 	if m.done {
 		return ""
 	}
@@ -116,7 +124,7 @@ func Input(prompt, placeholder string) (string, error) {
 	ti.CharLimit = 200
 	ti.Width = 60
 
-	m := InputModel{
+	m := inputModel{
 		textInput: ti,
 		prompt:    prompt,
 	}
@@ -127,6 +135,10 @@ func Input(prompt, placeholder string) (string, error) {
 		return "", err
 	}
 
-	result := finalModel.(InputModel).textInput.Value()
+	finalInput, ok := finalModel.(inputModel)
+	if !ok {
+		return "", fmt.Errorf("unexpected model type: %T", finalModel)
+	}
+	result := finalInput.textInput.Value()
 	return strings.TrimSpace(result), nil
 }

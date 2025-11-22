@@ -55,7 +55,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Build repository section
 	var repoInfo strings.Builder
-	repoInfo.WriteString(ui.InfoStyle.Render("Repository: ") + remoteURL + "\n")
+	repoInfo.WriteString(ui.InfoStyle.Render("Repository: "))
+	repoInfo.WriteString(remoteURL)
+	repoInfo.WriteString("\n")
 
 	branchInfo := fmt.Sprintf("Branch:     %s", branch)
 	if ahead > 0 || behind > 0 {
@@ -81,25 +83,35 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	log.Info("Repository status", "branch", branch, "ahead", ahead, "behind", behind, "remote", remoteURL)
 
 	// Check for uncommitted changes
-	hasChanges, _ := git.HasUncommittedChanges(claudeDir)
-	if hasChanges {
-		changedFiles, _ := git.GetChangedFiles(claudeDir)
-		var changeInfo strings.Builder
-		changeInfo.WriteString(ui.WarningStyle.Render(fmt.Sprintf("📝 Modified Files (%d)", len(changedFiles))) + "\n\n")
-		for _, file := range changedFiles {
-			changeInfo.WriteString(ui.ListItemStyle.Render("• " + file) + "\n")
+	hasChanges, err := git.HasUncommittedChanges(claudeDir)
+	if err != nil {
+		log.Warning("⚠️", "Could not check for uncommitted changes", "error", err)
+	} else if hasChanges {
+		changedFiles, err := git.GetChangedFiles(claudeDir)
+		if err != nil {
+			log.Warning("⚠️", "Could not get changed files", "error", err)
+		} else {
+			var changeInfo strings.Builder
+			changeInfo.WriteString(ui.WarningStyle.Render(fmt.Sprintf("📝 Modified Files (%d)", len(changedFiles))))
+			changeInfo.WriteString("\n\n")
+			for _, file := range changedFiles {
+				changeInfo.WriteString(ui.ListItemStyle.Render("• " + file))
+				changeInfo.WriteString("\n")
+			}
+			fmt.Println(ui.BoxStyle.Render(changeInfo.String()))
+			log.Warn("Uncommitted changes detected", "count", len(changedFiles), "files", changedFiles)
 		}
-		fmt.Println(ui.BoxStyle.Render(changeInfo.String()))
-		log.Warn("Uncommitted changes detected", "count", len(changedFiles), "files", changedFiles)
 	}
 
 	// Show plugins
 	plugins := getEnabledPlugins(claudeDir)
 	if len(plugins) > 0 {
 		var pluginInfo strings.Builder
-		pluginInfo.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("📦 Plugins (%d)", len(plugins))) + "\n\n")
+		pluginInfo.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("📦 Plugins (%d)", len(plugins))))
+		pluginInfo.WriteString("\n\n")
 		for _, plugin := range plugins {
-			pluginInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓")+" "+plugin) + "\n")
+			pluginInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + plugin))
+			pluginInfo.WriteString("\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(pluginInfo.String()))
 		log.Info("Enabled plugins", "count", len(plugins), "plugins", plugins)
@@ -109,9 +121,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	hooks := getHooks(claudeDir)
 	if len(hooks) > 0 {
 		var hookInfo strings.Builder
-		hookInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🪝 Hooks (%d)", len(hooks))) + "\n\n")
+		hookInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🪝 Hooks (%d)", len(hooks))))
+		hookInfo.WriteString("\n\n")
 		for _, hook := range hooks {
-			hookInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓")+" "+hook) + "\n")
+			hookInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + hook))
+			hookInfo.WriteString("\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(hookInfo.String()))
 		log.Info("Installed hooks", "count", len(hooks), "hooks", hooks)
@@ -121,9 +135,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	skills := getSkills(claudeDir)
 	if len(skills) > 0 {
 		var skillInfo strings.Builder
-		skillInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🎯 Skills (%d)", len(skills))) + "\n\n")
+		skillInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🎯 Skills (%d)", len(skills))))
+		skillInfo.WriteString("\n\n")
 		for _, skill := range skills {
-			skillInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓")+" "+skill) + "\n")
+			skillInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + skill))
+			skillInfo.WriteString("\n")
 		}
 		fmt.Println(ui.BoxStyle.Render(skillInfo.String()))
 		log.Info("Loaded skills", "count", len(skills), "skills", skills)

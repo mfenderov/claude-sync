@@ -1,3 +1,8 @@
+// Package version provides version information for the claude-sync binary.
+//
+// Version information is injected at build time via ldflags. This allows
+// each build to embed its exact version, commit SHA, and build date for
+// troubleshooting and debugging purposes.
 package version
 
 import (

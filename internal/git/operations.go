@@ -1,3 +1,12 @@
+// Package git provides operations for git repository management.
+//
+// This package wraps common git operations like init, commit, pull, push,
+// and remote validation. It's designed specifically for managing Claude Code
+// configuration repositories.
+//
+// Thread Safety: Functions in this package are NOT thread-safe.
+// Callers must ensure that only one operation is performed on a
+// given repository at a time.
 package git
 
 import (
@@ -62,14 +71,14 @@ func GetChangedFiles(repoPath string) ([]string, error) {
 func CommitChanges(repoPath string, message string) error {
 	// Stage all tracked files
 	cmd := exec.Command("git", "-C", repoPath, "add", "-u")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to stage changes: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
 	}
 
 	// Commit
 	cmd = exec.Command("git", "-C", repoPath, "commit", "-m", message)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to commit: %w\nOutput: %s", err, string(output))
 	}
 
 	return nil
@@ -115,8 +124,12 @@ func GetBranchInfo(repoPath string) (branch string, ahead, behind int, err error
 
 	parts := strings.Fields(strings.TrimSpace(string(output)))
 	if len(parts) == 2 {
-		fmt.Sscanf(parts[0], "%d", &ahead)
-		fmt.Sscanf(parts[1], "%d", &behind)
+		if _, err := fmt.Sscanf(parts[0], "%d", &ahead); err != nil {
+			return branch, 0, 0, fmt.Errorf("failed to parse ahead count: %w", err)
+		}
+		if _, err := fmt.Sscanf(parts[1], "%d", &behind); err != nil {
+			return branch, 0, 0, fmt.Errorf("failed to parse behind count: %w", err)
+		}
 	}
 
 	return branch, ahead, behind, nil
@@ -160,8 +173,8 @@ func IsGitRepo(repoPath string) bool {
 // InitRepo initializes a new git repository
 func InitRepo(repoPath string) error {
 	cmd := exec.Command("git", "-C", repoPath, "init")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to initialize git repo: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to initialize git repo: %w\nOutput: %s", err, string(output))
 	}
 	return nil
 }
@@ -179,8 +192,8 @@ func ValidateRemote(remoteURL string) error {
 // AddRemote adds a remote repository
 func AddRemote(repoPath, name, url string) error {
 	cmd := exec.Command("git", "-C", repoPath, "remote", "add", name, url)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to add remote: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to add remote: %w\nOutput: %s", err, string(output))
 	}
 	return nil
 }
@@ -189,14 +202,14 @@ func AddRemote(repoPath, name, url string) error {
 func InitialCommit(repoPath, message string) error {
 	// Stage all files
 	cmd := exec.Command("git", "-C", repoPath, "add", ".")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to stage files: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to stage files: %w\nOutput: %s", err, string(output))
 	}
 
 	// Commit
 	cmd = exec.Command("git", "-C", repoPath, "commit", "-m", message)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create initial commit: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create initial commit: %w\nOutput: %s", err, string(output))
 	}
 
 	return nil
@@ -235,7 +248,7 @@ Thumbs.db
 `
 
 	gitignorePath := filepath.Join(repoPath, ".gitignore")
-	if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0644); err != nil {
+	if err := os.WriteFile(gitignorePath, []byte(gitignoreContent), 0o644); err != nil {
 		return fmt.Errorf("failed to create .gitignore: %w", err)
 	}
 
@@ -258,8 +271,8 @@ func HasConflicts(repoPath string) (bool, error) {
 // AbortRebase aborts an ongoing rebase
 func AbortRebase(repoPath string) error {
 	cmd := exec.Command("git", "-C", repoPath, "rebase", "--abort")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to abort rebase: %w", err)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to abort rebase: %w\nOutput: %s", err, string(output))
 	}
 	return nil
 }
