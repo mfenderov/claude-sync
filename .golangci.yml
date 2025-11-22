@@ -7,34 +7,82 @@ run:
 
 linters:
   enable:
-    - govet
+    # Core linters (we already have)
     - errcheck
+    - govet
+    - ineffassign
     - staticcheck
     - unused
-    - ineffassign
-    - gocritic
-    - gocyclo
-    - misspell
-    - revive
-    - unconvert
-    - unparam
+
+    # Additional Docker cagent linters
+    - containedctx      # Detects context.Context in structs
+    - copyloopvar       # Detects loop variable capture issues
+    - depguard          # Checks for disallowed dependencies
+    - gocritic          # Opinionated Go linter
+    - importas          # Enforces consistent import aliases
+    - misspell          # Finds spelling mistakes
+    - nakedret          # Finds naked returns in long functions
+    - revive            # Fast, configurable, extensible linter
+    - unconvert         # Removes unnecessary type conversions
+    - unparam           # Reports unused function parameters
+    - forbidigo         # Forbids specific identifiers
+
   settings:
     gocyclo:
       min-complexity: 15
+
     revive:
       rules:
         - name: exported
           disabled: false
         - name: indent-error-flow
           disabled: false
+
     govet:
       enable-all: true
       disable:
         - shadow
 
+    # Forbid problematic patterns (from Docker cagent)
+    forbidigo:
+      forbid:
+        - pattern: context\.Background\(\)
+          msg: "do not use context.Background() in tests, use t.Context()"
+        - pattern: context\.TODO\(\)
+          msg: "do not use context.TODO(), pass context explicitly"
+        - pattern: os\.MkdirTemp\(\)
+          msg: "do not use os.MkdirTemp() in tests, use t.TempDir()"
+
+    # Enforce import ordering (from Docker cagent)
+    depguard:
+      rules:
+        prevent-old-yaml:
+          files:
+            - "**/*.go"
+          deny:
+            - pkg: gopkg.in/yaml.v3
+              desc: "use encoding/json or a modern yaml library instead"
+
 formatters:
   enable:
-    - gofmt
+    - gci           # Import organization
+    - gofmt         # Standard formatting
+    - gofumpt       # Stricter gofmt (from Docker cagent)
+
+  settings:
+    # Import organization (from Docker cagent)
+    gci:
+      custom-order: true
+      sections:
+        - standard                                      # Standard library
+        - default                                       # External packages
+        - prefix(github.com/mfenderov/claude-sync)     # Internal packages
+
+    # Auto-replace interface{} with any
+    gofmt:
+      rewrite-rules:
+        - pattern: 'interface{}'
+          replacement: 'any'
 
 issues:
   max-issues-per-linter: 0

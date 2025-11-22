@@ -4,12 +4,17 @@
 // and remote validation. It's designed specifically for managing Claude Code
 // configuration repositories.
 //
+// All functions accept a context.Context as their first parameter for
+// cancellation support. Git operations can be interrupted gracefully by
+// cancelling the context (e.g., via Ctrl+C).
+//
 // Thread Safety: Functions in this package are NOT thread-safe.
 // Callers must ensure that only one operation is performed on a
 // given repository at a time.
 package git
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -37,8 +42,8 @@ func GetClaudeDir() (string, error) {
 }
 
 // HasUncommittedChanges checks if there are uncommitted changes
-func HasUncommittedChanges(repoPath string) (bool, error) {
-	cmd := exec.Command("git", "-C", repoPath, "diff-index", "--quiet", "HEAD", "--")
+func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff-index", "--quiet", "HEAD", "--")
 	err := cmd.Run()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -53,8 +58,8 @@ func HasUncommittedChanges(repoPath string) (bool, error) {
 }
 
 // GetChangedFiles returns list of modified files
-func GetChangedFiles(repoPath string) ([]string, error) {
-	cmd := exec.Command("git", "-C", repoPath, "diff", "--name-only", "HEAD")
+func GetChangedFiles(ctx context.Context, repoPath string) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--name-only", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get changed files: %w", err)
@@ -68,15 +73,15 @@ func GetChangedFiles(repoPath string) ([]string, error) {
 }
 
 // CommitChanges commits all tracked changes
-func CommitChanges(repoPath string, message string) error {
+func CommitChanges(ctx context.Context, repoPath string, message string) error {
 	// Stage all tracked files
-	cmd := exec.Command("git", "-C", repoPath, "add", "-u")
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "add", "-u")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
 	}
 
 	// Commit
-	cmd = exec.Command("git", "-C", repoPath, "commit", "-m", message)
+	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "commit", "-m", message)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to commit: %w\nOutput: %s", err, string(output))
 	}
@@ -85,8 +90,8 @@ func CommitChanges(repoPath string, message string) error {
 }
 
 // PullWithRebase pulls from remote with rebase
-func PullWithRebase(repoPath string) error {
-	cmd := exec.Command("git", "-C", repoPath, "pull", "--rebase")
+func PullWithRebase(ctx context.Context, repoPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "pull", "--rebase")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to pull: %w\nOutput: %s", err, string(output))
@@ -95,8 +100,8 @@ func PullWithRebase(repoPath string) error {
 }
 
 // Push pushes to remote
-func Push(repoPath string) error {
-	cmd := exec.Command("git", "-C", repoPath, "push")
+func Push(ctx context.Context, repoPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "push")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to push: %w\nOutput: %s", err, string(output))
@@ -105,9 +110,9 @@ func Push(repoPath string) error {
 }
 
 // GetBranchInfo returns current branch and ahead/behind counts
-func GetBranchInfo(repoPath string) (branch string, ahead, behind int, err error) {
+func GetBranchInfo(ctx context.Context, repoPath string) (branch string, ahead, behind int, err error) {
 	// Get branch name
-	cmd := exec.Command("git", "-C", repoPath, "branch", "--show-current")
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "branch", "--show-current")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("failed to get branch: %w", err)
@@ -115,7 +120,7 @@ func GetBranchInfo(repoPath string) (branch string, ahead, behind int, err error
 	branch = strings.TrimSpace(string(output))
 
 	// Get ahead/behind counts
-	cmd = exec.Command("git", "-C", repoPath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	output, err = cmd.Output()
 	if err != nil {
 		// No upstream or other error, return branch only
@@ -136,8 +141,8 @@ func GetBranchInfo(repoPath string) (branch string, ahead, behind int, err error
 }
 
 // GetRecentCommits returns recent commit messages
-func GetRecentCommits(repoPath string, count int) ([]string, error) {
-	cmd := exec.Command("git", "-C", repoPath, "log", fmt.Sprintf("-%d", count), "--pretty=format:%h %s")
+func GetRecentCommits(ctx context.Context, repoPath string, count int) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "log", fmt.Sprintf("-%d", count), "--pretty=format:%h %s")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commits: %w", err)
@@ -171,8 +176,8 @@ func IsGitRepo(repoPath string) bool {
 }
 
 // InitRepo initializes a new git repository
-func InitRepo(repoPath string) error {
-	cmd := exec.Command("git", "-C", repoPath, "init")
+func InitRepo(ctx context.Context, repoPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "init")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to initialize git repo: %w\nOutput: %s", err, string(output))
 	}
@@ -180,8 +185,8 @@ func InitRepo(repoPath string) error {
 }
 
 // ValidateRemote checks if a remote repository exists and is accessible
-func ValidateRemote(remoteURL string) error {
-	cmd := exec.Command("git", "ls-remote", remoteURL)
+func ValidateRemote(ctx context.Context, remoteURL string) error {
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", remoteURL)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("remote repository not accessible: %w\nOutput: %s", err, string(output))
@@ -190,8 +195,8 @@ func ValidateRemote(remoteURL string) error {
 }
 
 // AddRemote adds a remote repository
-func AddRemote(repoPath, name, url string) error {
-	cmd := exec.Command("git", "-C", repoPath, "remote", "add", name, url)
+func AddRemote(ctx context.Context, repoPath, name, url string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "remote", "add", name, url)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to add remote: %w\nOutput: %s", err, string(output))
 	}
@@ -199,15 +204,15 @@ func AddRemote(repoPath, name, url string) error {
 }
 
 // InitialCommit creates the initial commit with all files
-func InitialCommit(repoPath, message string) error {
+func InitialCommit(ctx context.Context, repoPath, message string) error {
 	// Stage all files
-	cmd := exec.Command("git", "-C", repoPath, "add", ".")
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "add", ".")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to stage files: %w\nOutput: %s", err, string(output))
 	}
 
 	// Commit
-	cmd = exec.Command("git", "-C", repoPath, "commit", "-m", message)
+	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "commit", "-m", message)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create initial commit: %w\nOutput: %s", err, string(output))
 	}
@@ -256,9 +261,9 @@ Thumbs.db
 }
 
 // HasConflicts checks if there are merge conflicts
-func HasConflicts(repoPath string) (bool, error) {
+func HasConflicts(ctx context.Context, repoPath string) (bool, error) {
 	// Check for unmerged paths
-	cmd := exec.Command("git", "-C", repoPath, "diff", "--name-only", "--diff-filter=U")
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--name-only", "--diff-filter=U")
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("failed to check for conflicts: %w", err)
@@ -269,8 +274,8 @@ func HasConflicts(repoPath string) (bool, error) {
 }
 
 // AbortRebase aborts an ongoing rebase
-func AbortRebase(repoPath string) error {
-	cmd := exec.Command("git", "-C", repoPath, "rebase", "--abort")
+func AbortRebase(ctx context.Context, repoPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "rebase", "--abort")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to abort rebase: %w\nOutput: %s", err, string(output))
 	}

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/mfenderov/claude-sync/internal/git"
 	"github.com/mfenderov/claude-sync/internal/logger"
 	"github.com/mfenderov/claude-sync/internal/prompts"
 	"github.com/mfenderov/claude-sync/internal/ui"
-	"github.com/spf13/cobra"
 )
 
 var syncCmd = &cobra.Command{

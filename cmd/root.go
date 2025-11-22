@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mfenderov/claude-sync/internal/version"
 	"github.com/spf13/cobra"
+
+	"github.com/mfenderov/claude-sync/internal/version"
 )
 
 var rootCmd = &cobra.Command{
