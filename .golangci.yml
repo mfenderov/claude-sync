@@ -21,7 +21,7 @@ linters:
     - unconvert
     - unparam
 
-linters-settings:
+settings:
   gocyclo:
     min-complexity: 15
 
@@ -38,6 +38,5 @@ linters-settings:
       - shadow
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
