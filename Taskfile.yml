@@ -4,6 +4,17 @@ vars:
   BINARY_NAME: claude-sync
   BUILD_DIR: bin
   MAIN_PACKAGE: .
+  GIT_TAG:
+    sh: git describe --tags --exact-match 2>/dev/null || echo "dev"
+  GIT_COMMIT:
+    sh: git rev-parse HEAD 2>/dev/null || echo "unknown"
+  BUILD_DATE:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  LDFLAGS: >-
+    -s -w
+    -X "github.com/mfenderov/claude-sync/internal/version.Version={{.GIT_TAG}}"
+    -X "github.com/mfenderov/claude-sync/internal/version.Commit={{.GIT_COMMIT}}"
+    -X "github.com/mfenderov/claude-sync/internal/version.Date={{.BUILD_DATE}}"
 
 tasks:
   default:
@@ -18,10 +29,10 @@ tasks:
       - go install gotest.tools/gotestsum@latest
 
   build:
-    desc: Build the binary
+    desc: Build the binary with version info
     cmds:
       - mkdir -p {{.BUILD_DIR}}
-      - go build -v -o {{.BUILD_DIR}}/{{.BINARY_NAME}} {{.MAIN_PACKAGE}}
+      - go build -v -ldflags "{{.LDFLAGS}}" -o {{.BUILD_DIR}}/{{.BINARY_NAME}} {{.MAIN_PACKAGE}}
     sources:
       - "**/*.go"
       - go.mod
@@ -30,9 +41,9 @@ tasks:
       - "{{.BUILD_DIR}}/{{.BINARY_NAME}}"
 
   install:
-    desc: Install the binary to $GOPATH/bin
+    desc: Install the binary to $GOPATH/bin with version info
     cmds:
-      - go install {{.MAIN_PACKAGE}}
+      - go install -ldflags "{{.LDFLAGS}}" {{.MAIN_PACKAGE}}
 
   test:
     desc: Run tests
@@ -107,4 +118,11 @@ tasks:
   dev:
     desc: Run in development mode (build + run)
     cmds:
-      - go run {{.MAIN_PACKAGE}} {{.CLI_ARGS}}
+      - go run -ldflags "{{.LDFLAGS}}" {{.MAIN_PACKAGE}} {{.CLI_ARGS}}
+
+  version:
+    desc: Show version information
+    cmds:
+      - echo "Version:    {{.GIT_TAG}}"
+      - echo "Commit:     {{.GIT_COMMIT}}"
+      - echo "Build Date: {{.BUILD_DATE}}"

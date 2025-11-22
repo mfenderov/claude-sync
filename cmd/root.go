@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mfenderov/claude-sync/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -14,7 +15,16 @@ var rootCmd = &cobra.Command{
 
 Keep your Claude Code settings, hooks, plugins, and skills synchronized
 across multiple machines with git-based syncing.`,
-	Version: "0.1.0",
+	Version: version.Get().Version,
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show version information",
+	Long:  "Display detailed version information including commit, build date, and platform",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(version.Get().Verbose())
+	},
 }
 
 func Execute() {
@@ -25,6 +35,13 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.SetVersionTemplate(`{{.Version}}
-`)
+	rootCmd.AddCommand(versionCmd)
+
+	// Custom version template for --version flag
+	v := version.Get()
+	if v.Commit != "unknown" {
+		rootCmd.SetVersionTemplate(fmt.Sprintf("%s (commit: %s)\n", v.String(), v.ShortCommit()))
+	} else {
+		rootCmd.SetVersionTemplate(v.String() + "\n")
+	}
 }
