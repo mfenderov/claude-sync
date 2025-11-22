@@ -1,5 +1,11 @@
 # 🎭 claude-sync
 
+[![CI](https://github.com/mfenderov/claude-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/mfenderov/claude-sync/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mfenderov/claude-sync)](https://goreportcard.com/report/github.com/mfenderov/claude-sync)
+[![codecov](https://codecov.io/gh/mfenderov/claude-sync/branch/main/graph/badge.svg)](https://codecov.io/gh/mfenderov/claude-sync)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/mfenderov/claude-sync)](https://go.dev/)
+
 A beautiful CLI tool for syncing Claude Code configurations across machines.
 
 Built with ❤️ using Go and [Charm](https://charm.sh/) libraries.
@@ -162,9 +168,76 @@ claude-sync          # Sync it!
 - [ ] Config validation
 - [ ] Remote config templates
 
+## 🛠 Development
+
+This project uses [Task](https://taskfile.dev/) for build automation.
+
+### Prerequisites
+
+- Go 1.21 or later
+- Git
+- Task (optional, but recommended)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/mfenderov/claude-sync.git
+cd claude-sync
+
+# Install development tools
+task install-tools
+
+# Run tests
+task test
+
+# Build
+task build
+
+# Run all checks
+task check
+```
+
+### Available Tasks
+
+```bash
+task --list              # Show all available tasks
+task test                # Run tests
+task test-coverage       # Run tests with coverage report
+task lint                # Run linter
+task fmt                 # Format code
+task build               # Build binary
+task install             # Install to $GOPATH/bin
+task ci                  # Run all CI checks locally
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+task test-coverage
+
+# Run tests in verbose mode
+task test-verbose
+```
+
 ## 🤝 Contributing
 
 This is currently a personal project, but suggestions and contributions are welcome!
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`task test`)
+5. Run linter (`task lint`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
 
 ## 📝 License
 

@@ -1,0 +1,94 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: claude-sync
+    binary: claude-sync
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: claude-sync
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+  groups:
+    - title: Features
+      regexp: '^feat:'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix:'
+      order: 1
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: mfenderov
+    name: claude-sync
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## 🎭 claude-sync {{ .Tag }}
+
+    A beautiful CLI tool for syncing Claude Code configurations across machines.
+  footer: |
+    **Full Changelog**: https://github.com/mfenderov/claude-sync/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+brews:
+  - name: claude-sync
+    homepage: https://github.com/mfenderov/claude-sync
+    description: Beautiful CLI tool for syncing Claude Code configurations
+    license: MIT
+    repository:
+      owner: mfenderov
+      name: homebrew-tap
+      branch: main
+    folder: Formula
+    commit_author:
+      name: Mark Fenderov
+      email: mfenderov@users.noreply.github.com
+    install: |
+      bin.install "claude-sync"
+    test: |
+      system "#{bin}/claude-sync", "--version"

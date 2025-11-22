@@ -45,7 +45,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 		msg := "~/.claude is not a git repository"
 		fmt.Println(ui.RenderError("✗", msg))
 		fmt.Println(ui.RenderMuted("  Run: cd ~/.claude && git init"))
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	// Step 1: Check for local changes

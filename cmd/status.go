@@ -40,7 +40,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if !git.IsGitRepo(claudeDir) {
 		msg := "~/.claude is not a git repository"
 		fmt.Println(ui.RenderError("✗", msg))
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	// Get branch info

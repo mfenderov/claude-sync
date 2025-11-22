@@ -1,0 +1,75 @@
+name: CI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      
+      - name: Set up Go
+        uses: actions/setup-go@0aaccf5e7e7ab9e5484bb3a81f71b4c18c1f1f0f
+        with:
+          go-version: "1.23"
+          cache: true
+      
+      - name: Lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9
+        with:
+          version: latest
+
+  test:
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        go: ["1.21", "1.22", "1.23"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      
+      - name: Set up Go
+        uses: actions/setup-go@0aaccf5e7e7ab9e5484bb3a81f71b4c18c1f1f0f
+        with:
+          go-version: ${{matrix.go}}
+          cache: true
+      
+      - name: Run tests
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.go == '1.23'
+        uses: codecov/codecov-action@7f8b4b4bde536c465e797be725718b88c5d95e0e
+        with:
+          files: ./coverage.txt
+          flags: unittests
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      
+      - name: Set up Go
+        uses: actions/setup-go@0aaccf5e7e7ab9e5484bb3a81f71b4c18c1f1f0f
+        with:
+          go-version: "1.23"
+          cache: true
+      
+      - name: Build
+        run: go build -v ./...
