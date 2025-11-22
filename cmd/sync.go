@@ -46,7 +46,31 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return runInitFlow(log, claudeDir)
 	}
 
-	// Step 1: Check for local changes
+	// Step 1: Commit local changes if any
+	if err := commitLocalChanges(log, claudeDir); err != nil {
+		return err
+	}
+
+	// Step 2: Pull with rebase
+	if err := pullWithRebaseAndHandleConflicts(log, claudeDir); err != nil {
+		return err
+	}
+
+	// Step 3: Push to remote
+	if err := pushToRemote(log, claudeDir); err != nil {
+		return err
+	}
+
+	// Show recent activity
+	showRecentActivity(log, claudeDir)
+
+	log.Success("✨", "Sync complete!")
+	log.Newline()
+
+	return nil
+}
+
+func commitLocalChanges(log *logger.Logger, claudeDir string) error {
 	log.InfoMsg("⏳", "Checking for local changes...", "directory", claudeDir)
 	hasChanges, err := git.HasUncommittedChanges(claudeDir)
 	if err != nil {
@@ -54,68 +78,79 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if hasChanges {
-		// Get changed files
-		changedFiles, err := git.GetChangedFiles(claudeDir)
-		if err != nil {
-			log.Error("✗", "Failed to get changed files", err, "directory", claudeDir)
-			return err
-		}
-
-		log.Success("✓", fmt.Sprintf("Found %d changed file(s)", len(changedFiles)),
-			"count", len(changedFiles), "files", changedFiles)
-		for _, file := range changedFiles {
-			log.ListItem("→ " + file)
-		}
-		log.Newline()
-
-		// Step 2: Commit changes
-		commitMsg := git.GenerateAutoCommitMessage()
-		log.InfoMsg("⏳", "Committing changes...", "message", commitMsg)
-		if err := git.CommitChanges(claudeDir, commitMsg); err != nil {
-			log.Error("✗", "Failed to commit", err, "directory", claudeDir)
-			return err
-		}
-		log.Success("✓", "Changes committed", "message", commitMsg)
-		log.Muted("  " + commitMsg)
-		log.Newline()
-	} else {
+	if !hasChanges {
 		log.Success("✓", "No local changes")
 		log.Newline()
+		return nil
 	}
 
-	// Step 3: Pull with rebase
+	// Get changed files
+	changedFiles, err := git.GetChangedFiles(claudeDir)
+	if err != nil {
+		log.Error("✗", "Failed to get changed files", err, "directory", claudeDir)
+		return err
+	}
+
+	log.Success("✓", fmt.Sprintf("Found %d changed file(s)", len(changedFiles)),
+		"count", len(changedFiles), "files", changedFiles)
+	for _, file := range changedFiles {
+		log.ListItem("→ " + file)
+	}
+	log.Newline()
+
+	// Commit changes
+	commitMsg := git.GenerateAutoCommitMessage()
+	log.InfoMsg("⏳", "Committing changes...", "message", commitMsg)
+	if err := git.CommitChanges(claudeDir, commitMsg); err != nil {
+		log.Error("✗", "Failed to commit", err, "directory", claudeDir)
+		return err
+	}
+	log.Success("✓", "Changes committed", "message", commitMsg)
+	log.Muted("  " + commitMsg)
+	log.Newline()
+	return nil
+}
+
+func pullWithRebaseAndHandleConflicts(log *logger.Logger, claudeDir string) error {
 	log.InfoMsg("⏳", "Pulling from remote (with rebase)...", "directory", claudeDir)
 	if err := git.PullWithRebase(claudeDir); err != nil {
-		// Check for conflicts
-		hasConflicts, conflictErr := git.HasConflicts(claudeDir)
-		if conflictErr == nil && hasConflicts {
-			log.Error("✗", "Merge conflicts detected!", err, "directory", claudeDir)
-			log.Warning("⚠️", "Conflicts found - aborting sync to keep your config safe")
-			log.Muted("  Please resolve conflicts manually and try again:")
-			log.Muted("  1. cd ~/.claude")
-			log.Muted("  2. Resolve conflicts in affected files")
-			log.Muted("  3. git add <resolved-files>")
-			log.Muted("  4. git rebase --continue")
-			log.Muted("  5. Run claude-sync again")
-			log.Newline()
-
-			// Abort the rebase to leave repo in clean state
-			if abortErr := git.AbortRebase(claudeDir); abortErr != nil {
-				log.Warning("⚠️", "Failed to abort rebase - manual intervention needed", "error", abortErr)
-			} else {
-				log.InfoMsg("ℹ️", "Rebase aborted - repository restored to previous state")
-			}
-			log.Newline()
-			return fmt.Errorf("merge conflicts detected - sync aborted")
-		}
-		log.Error("✗", "Failed to pull", err, "directory", claudeDir)
-		return err
+		return handlePullError(log, claudeDir, err)
 	}
 	log.Success("✓", "Pulled latest changes")
 	log.Newline()
+	return nil
+}
 
-	// Step 4: Push
+func handlePullError(log *logger.Logger, claudeDir string, pullErr error) error {
+	// Check for conflicts
+	hasConflicts, conflictErr := git.HasConflicts(claudeDir)
+	if conflictErr != nil || !hasConflicts {
+		log.Error("✗", "Failed to pull", pullErr, "directory", claudeDir)
+		return pullErr
+	}
+
+	// Handle merge conflicts
+	log.Error("✗", "Merge conflicts detected!", pullErr, "directory", claudeDir)
+	log.Warning("⚠️", "Conflicts found - aborting sync to keep your config safe")
+	log.Muted("  Please resolve conflicts manually and try again:")
+	log.Muted("  1. cd ~/.claude")
+	log.Muted("  2. Resolve conflicts in affected files")
+	log.Muted("  3. git add <resolved-files>")
+	log.Muted("  4. git rebase --continue")
+	log.Muted("  5. Run claude-sync again")
+	log.Newline()
+
+	// Abort the rebase to leave repo in clean state
+	if abortErr := git.AbortRebase(claudeDir); abortErr != nil {
+		log.Warning("⚠️", "Failed to abort rebase - manual intervention needed", "error", abortErr)
+	} else {
+		log.InfoMsg("ℹ️", "Rebase aborted - repository restored to previous state")
+	}
+	log.Newline()
+	return fmt.Errorf("merge conflicts detected - sync aborted")
+}
+
+func pushToRemote(log *logger.Logger, claudeDir string) error {
 	log.InfoMsg("⏳", "Pushing to remote...", "directory", claudeDir)
 	if err := git.Push(claudeDir); err != nil {
 		log.Error("✗", "Failed to push", err, "directory", claudeDir)
@@ -123,22 +158,20 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 	log.Success("✓", "Pushed to remote")
 	log.Newline()
+	return nil
+}
 
-	// Show recent commits
+func showRecentActivity(log *logger.Logger, claudeDir string) {
 	commits, err := git.GetRecentCommits(claudeDir, 5)
-	if err == nil && len(commits) > 0 {
-		var commitList strings.Builder
-		for _, commit := range commits {
-			commitList.WriteString(ui.ListItemStyle.Render(commit) + "\n")
-		}
-
-		log.Box("Recent Activity", commitList.String())
+	if err != nil || len(commits) == 0 {
+		return
 	}
 
-	log.Success("✨", "Sync complete!")
-	log.Newline()
-
-	return nil
+	var commitList strings.Builder
+	for _, commit := range commits {
+		commitList.WriteString(ui.ListItemStyle.Render(commit) + "\n")
+	}
+	log.Box("Recent Activity", commitList.String())
 }
 
 // runInitFlow handles first-time setup when ~/.claude is not a git repo

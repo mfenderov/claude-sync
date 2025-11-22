@@ -70,6 +70,8 @@ func Confirm(prompt string) (bool, error) {
 }
 
 // inputModel is a model for text input prompts
+//
+//nolint:govet // fieldalignment: struct contains large external library type
 type inputModel struct {
 	textInput textinput.Model
 	prompt    string

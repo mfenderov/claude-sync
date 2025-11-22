@@ -65,8 +65,8 @@ func createTestRepo(t *testing.T) string {
 
 func TestIsGitRepo(t *testing.T) {
 	tests := []struct {
-		name     string
 		setup    func() string
+		name     string
 		expected bool
 	}{
 		{
@@ -108,8 +108,8 @@ func TestIsGitRepo(t *testing.T) {
 
 func TestHasUncommittedChanges(t *testing.T) {
 	tests := []struct {
-		name     string
 		setup    func(string)
+		name     string
 		expected bool
 	}{
 		{

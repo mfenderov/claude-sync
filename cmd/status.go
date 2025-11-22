@@ -43,110 +43,136 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s", msg)
 	}
 
-	// Get branch info
+	// Get and display branch info
 	branch, ahead, behind, err := git.GetBranchInfo(claudeDir)
 	if err != nil {
 		fmt.Println(ui.RenderError("✗", "Failed to get branch info"))
 		return err
 	}
+	displayRepositoryInfo(claudeDir, branch, ahead, behind, log)
 
-	// Get remote URL
+	// Display modified files if any
+	displayModifiedFiles(claudeDir, log)
+
+	// Display plugins, hooks, and skills
+	displayPlugins(claudeDir, log)
+	displayHooks(claudeDir, log)
+	displaySkills(claudeDir, log)
+
+	log.Newline()
+	return nil
+}
+
+func displayRepositoryInfo(claudeDir, branch string, ahead, behind int, log *logger.Logger) {
 	remoteURL := getRemoteURL(claudeDir)
 
-	// Build repository section
 	var repoInfo strings.Builder
 	repoInfo.WriteString(ui.InfoStyle.Render("Repository: "))
 	repoInfo.WriteString(remoteURL)
 	repoInfo.WriteString("\n")
 
-	branchInfo := fmt.Sprintf("Branch:     %s", branch)
-	if ahead > 0 || behind > 0 {
-		branchInfo += fmt.Sprintf(" ↑%d ↓%d", ahead, behind)
-		if ahead > 0 {
-			branchInfo += ui.WarningStyle.Render(fmt.Sprintf(" (%d ahead", ahead))
-			if behind > 0 {
-				branchInfo += ", "
-			}
-		}
-		if behind > 0 {
-			if ahead == 0 {
-				branchInfo += ui.WarningStyle.Render(fmt.Sprintf(" (%d behind", behind))
-			} else {
-				branchInfo += ui.WarningStyle.Render(fmt.Sprintf("%d behind", behind))
-			}
-		}
-		branchInfo += ui.WarningStyle.Render(")")
-	}
+	branchInfo := formatBranchInfo(branch, ahead, behind)
 	repoInfo.WriteString(ui.InfoStyle.Render(branchInfo))
 
 	fmt.Println(ui.BoxStyle.Render(repoInfo.String()))
 	log.Info("Repository status", "branch", branch, "ahead", ahead, "behind", behind, "remote", remoteURL)
+}
 
-	// Check for uncommitted changes
+func formatBranchInfo(branch string, ahead, behind int) string {
+	branchInfo := fmt.Sprintf("Branch:     %s", branch)
+	if ahead == 0 && behind == 0 {
+		return branchInfo
+	}
+
+	branchInfo += fmt.Sprintf(" ↑%d ↓%d", ahead, behind)
+	var status []string
+	if ahead > 0 {
+		status = append(status, fmt.Sprintf("%d ahead", ahead))
+	}
+	if behind > 0 {
+		status = append(status, fmt.Sprintf("%d behind", behind))
+	}
+	branchInfo += ui.WarningStyle.Render(fmt.Sprintf(" (%s)", strings.Join(status, ", ")))
+	return branchInfo
+}
+
+func displayModifiedFiles(claudeDir string, log *logger.Logger) {
 	hasChanges, err := git.HasUncommittedChanges(claudeDir)
 	if err != nil {
 		log.Warning("⚠️", "Could not check for uncommitted changes", "error", err)
-	} else if hasChanges {
-		changedFiles, err := git.GetChangedFiles(claudeDir)
-		if err != nil {
-			log.Warning("⚠️", "Could not get changed files", "error", err)
-		} else {
-			var changeInfo strings.Builder
-			changeInfo.WriteString(ui.WarningStyle.Render(fmt.Sprintf("📝 Modified Files (%d)", len(changedFiles))))
-			changeInfo.WriteString("\n\n")
-			for _, file := range changedFiles {
-				changeInfo.WriteString(ui.ListItemStyle.Render("• " + file))
-				changeInfo.WriteString("\n")
-			}
-			fmt.Println(ui.BoxStyle.Render(changeInfo.String()))
-			log.Warn("Uncommitted changes detected", "count", len(changedFiles), "files", changedFiles)
-		}
+		return
 	}
 
-	// Show plugins
+	if !hasChanges {
+		return
+	}
+
+	changedFiles, err := git.GetChangedFiles(claudeDir)
+	if err != nil {
+		log.Warning("⚠️", "Could not get changed files", "error", err)
+		return
+	}
+
+	var changeInfo strings.Builder
+	changeInfo.WriteString(ui.WarningStyle.Render(fmt.Sprintf("📝 Modified Files (%d)", len(changedFiles))))
+	changeInfo.WriteString("\n\n")
+	for _, file := range changedFiles {
+		changeInfo.WriteString(ui.ListItemStyle.Render("• " + file))
+		changeInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(changeInfo.String()))
+	log.Warn("Uncommitted changes detected", "count", len(changedFiles), "files", changedFiles)
+}
+
+func displayPlugins(claudeDir string, log *logger.Logger) {
 	plugins := getEnabledPlugins(claudeDir)
-	if len(plugins) > 0 {
-		var pluginInfo strings.Builder
-		pluginInfo.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("📦 Plugins (%d)", len(plugins))))
-		pluginInfo.WriteString("\n\n")
-		for _, plugin := range plugins {
-			pluginInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + plugin))
-			pluginInfo.WriteString("\n")
-		}
-		fmt.Println(ui.BoxStyle.Render(pluginInfo.String()))
-		log.Info("Enabled plugins", "count", len(plugins), "plugins", plugins)
+	if len(plugins) == 0 {
+		return
 	}
 
-	// Show hooks
+	var pluginInfo strings.Builder
+	pluginInfo.WriteString(ui.SuccessStyle.Render(fmt.Sprintf("📦 Plugins (%d)", len(plugins))))
+	pluginInfo.WriteString("\n\n")
+	for _, plugin := range plugins {
+		pluginInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + plugin))
+		pluginInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(pluginInfo.String()))
+	log.Info("Enabled plugins", "count", len(plugins), "plugins", plugins)
+}
+
+func displayHooks(claudeDir string, log *logger.Logger) {
 	hooks := getHooks(claudeDir)
-	if len(hooks) > 0 {
-		var hookInfo strings.Builder
-		hookInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🪝 Hooks (%d)", len(hooks))))
-		hookInfo.WriteString("\n\n")
-		for _, hook := range hooks {
-			hookInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + hook))
-			hookInfo.WriteString("\n")
-		}
-		fmt.Println(ui.BoxStyle.Render(hookInfo.String()))
-		log.Info("Installed hooks", "count", len(hooks), "hooks", hooks)
+	if len(hooks) == 0 {
+		return
 	}
 
-	// Show skills
+	var hookInfo strings.Builder
+	hookInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🪝 Hooks (%d)", len(hooks))))
+	hookInfo.WriteString("\n\n")
+	for _, hook := range hooks {
+		hookInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + hook))
+		hookInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(hookInfo.String()))
+	log.Info("Installed hooks", "count", len(hooks), "hooks", hooks)
+}
+
+func displaySkills(claudeDir string, log *logger.Logger) {
 	skills := getSkills(claudeDir)
-	if len(skills) > 0 {
-		var skillInfo strings.Builder
-		skillInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🎯 Skills (%d)", len(skills))))
-		skillInfo.WriteString("\n\n")
-		for _, skill := range skills {
-			skillInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + skill))
-			skillInfo.WriteString("\n")
-		}
-		fmt.Println(ui.BoxStyle.Render(skillInfo.String()))
-		log.Info("Loaded skills", "count", len(skills), "skills", skills)
+	if len(skills) == 0 {
+		return
 	}
 
-	log.Newline()
-	return nil
+	var skillInfo strings.Builder
+	skillInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🎯 Skills (%d)", len(skills))))
+	skillInfo.WriteString("\n\n")
+	for _, skill := range skills {
+		skillInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + skill))
+		skillInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(skillInfo.String()))
+	log.Info("Loaded skills", "count", len(skills), "skills", skills)
 }
 
 func getRemoteURL(repoPath string) string {
