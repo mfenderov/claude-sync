@@ -14,7 +14,7 @@ linters:
     - staticcheck
     - unused
 
-    # Additional Docker cagent linters
+    # Additional linters
     - containedctx      # Detects context.Context in structs
     - copyloopvar       # Detects loop variable capture issues
     - depguard          # Checks for disallowed dependencies
@@ -43,7 +43,7 @@ linters:
       disable:
         - shadow
 
-    # Forbid problematic patterns (from Docker cagent)
+    # Forbid problematic patterns
     forbidigo:
       forbid:
         - pattern: context\.Background\(\)
@@ -53,7 +53,7 @@ linters:
         - pattern: os\.MkdirTemp\(\)
           msg: "do not use os.MkdirTemp() in tests, use t.TempDir()"
 
-    # Enforce import ordering (from Docker cagent)
+    # Enforce import ordering
     depguard:
       rules:
         prevent-old-yaml:
@@ -67,10 +67,10 @@ formatters:
   enable:
     - gci           # Import organization
     - gofmt         # Standard formatting
-    - gofumpt       # Stricter gofmt (from Docker cagent)
+    - gofumpt       # Stricter gofmt
 
   settings:
-    # Import organization (from Docker cagent)
+    # Import organization
     gci:
       custom-order: true
       sections:
