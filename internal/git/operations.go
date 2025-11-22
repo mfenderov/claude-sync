@@ -60,7 +60,7 @@ func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
 				return true, nil
 			}
 		}
-		return false, &GitOperationError{
+		return false, &OperationError{
 			Op:   "diff-index",
 			Path: repoPath,
 			Err:  err,
@@ -282,7 +282,7 @@ func HasConflicts(ctx context.Context, repoPath string) (bool, error) {
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--name-only", "--diff-filter=U")
 	output, err := cmd.Output()
 	if err != nil {
-		return false, &GitOperationError{
+		return false, &OperationError{
 			Op:   "check conflicts",
 			Path: repoPath,
 			Err:  err,

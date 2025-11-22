@@ -2,24 +2,24 @@ package git
 
 import "fmt"
 
-// GitOperationError represents a generic git operation failure
-type GitOperationError struct {
+// OperationError represents a generic git operation failure
+type OperationError struct {
+	Err    error  // Underlying error
 	Op     string // Operation name (e.g., "pull", "push", "commit")
 	Path   string // Repository path
-	Err    error  // Underlying error
 	Output string // Command output if available
 }
 
-var _ error = &GitOperationError{}
+var _ error = &OperationError{}
 
-func (e *GitOperationError) Error() string {
+func (e *OperationError) Error() string {
 	if e.Output != "" {
 		return fmt.Sprintf("git %s failed for %s: %v\nOutput: %s", e.Op, e.Path, e.Err, e.Output)
 	}
 	return fmt.Sprintf("git %s failed for %s: %v", e.Op, e.Path, e.Err)
 }
 
-func (e *GitOperationError) Unwrap() error {
+func (e *OperationError) Unwrap() error {
 	return e.Err
 }
 
@@ -40,9 +40,9 @@ func (e *ConflictError) Error() string {
 
 // RemoteError represents a remote repository access error
 type RemoteError struct {
-	URL string // Remote URL
-	Op  string // Operation (validate, fetch, push)
-	Err error  // Underlying error
+	Err error
+	URL string
+	Op  string
 }
 
 var _ error = &RemoteError{}
@@ -57,9 +57,9 @@ func (e *RemoteError) Unwrap() error {
 
 // DirectoryError represents a directory-related error
 type DirectoryError struct {
-	Path string // Directory path
-	Op   string // Operation (e.g., "access", "create")
-	Err  error  // Underlying error
+	Err  error
+	Path string
+	Op   string
 }
 
 var _ error = &DirectoryError{}
