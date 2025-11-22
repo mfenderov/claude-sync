@@ -144,7 +144,7 @@ claude-sync/
 
 ## 🔧 Requirements
 
-- Go 1.21+
+- Go 1.25+
 - Git
 - Claude Code with config in `~/.claude`
 - A git hosting service account (GitHub, GitLab, Bitbucket, etc.)
