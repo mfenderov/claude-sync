@@ -24,7 +24,7 @@ jobs:
           cache: true
       
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@7abb51b123f8c226c8dcc8df9cc5f373285010e8
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
           args: release --clean
