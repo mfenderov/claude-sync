@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -327,5 +328,133 @@ func TestGetClaudeDir(t *testing.T) {
 	_, err = GetClaudeDir()
 	if err == nil {
 		t.Error("GetClaudeDir() should error when .claude doesn't exist")
+	}
+}
+
+func TestEnsureDefaultBranch(t *testing.T) {
+	t.Parallel()
+
+	repoPath := createTestRepo(t)
+	ctx := context.Background()
+
+	// Test 1: Branch should be renamed to 'main' if on 'master'
+	cmd := exec.Command("git", "branch", "-M", "master")
+	cmd.Dir = repoPath
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to rename to master: %v", err)
+	}
+
+	if err := ensureDefaultBranch(ctx, repoPath); err != nil {
+		t.Fatalf("ensureDefaultBranch failed: %v", err)
+	}
+
+	branch, err := getCurrentBranch(ctx, repoPath)
+	if err != nil {
+		t.Fatalf("Failed to get current branch: %v", err)
+	}
+
+	if branch != "main" {
+		t.Errorf("Expected branch 'main', got '%s'", branch)
+	}
+}
+
+func TestGetCurrentBranch(t *testing.T) {
+	t.Parallel()
+
+	repoPath := createTestRepo(t)
+	ctx := context.Background()
+
+	branch, err := getCurrentBranch(ctx, repoPath)
+	if err != nil {
+		t.Fatalf("Failed to get current branch: %v", err)
+	}
+
+	// Should be either main or master depending on git config
+	if branch != "main" && branch != "master" {
+		t.Errorf("Expected branch 'main' or 'master', got '%s'", branch)
+	}
+}
+
+func TestEnhancePushError(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		output        string
+		expectedInMsg string
+	}{
+		{
+			name:          "SSH permission denied",
+			output:        "Permission denied (publickey)",
+			expectedInMsg: "SSH authentication failed",
+		},
+		{
+			name:          "Authentication failed",
+			output:        "Authentication failed for",
+			expectedInMsg: "authentication failed",
+		},
+		{
+			name:          "Network timeout",
+			output:        "connection timed out",
+			expectedInMsg: "network error",
+		},
+		{
+			name:          "Repository not found",
+			output:        "repository not found",
+			expectedInMsg: "repository not found",
+		},
+		{
+			name:          "Generic error",
+			output:        "some random error",
+			expectedInMsg: "failed to push",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := enhancePushError(context.DeadlineExceeded, tc.output)
+			errMsg := err.Error()
+
+			if !strings.Contains(errMsg, tc.expectedInMsg) {
+				t.Errorf("Expected error message to contain '%s', got: %s", tc.expectedInMsg, errMsg)
+			}
+
+			// Verify that helpful guidance is included
+			if !strings.Contains(errMsg, "Common fixes") && tc.name != "Generic error" {
+				t.Errorf("Expected error message to contain 'Common fixes', got: %s", errMsg)
+			}
+		})
+	}
+}
+
+func TestEnhancePullError(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		output        string
+		expectedInMsg string
+	}{
+		{
+			name:          "No upstream configured",
+			output:        "There is no tracking information for the current branch",
+			expectedInMsg: "no upstream branch configured",
+		},
+		{
+			name:          "SSH permission denied during pull",
+			output:        "Permission denied (publickey)",
+			expectedInMsg: "SSH authentication failed",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := enhancePullError(context.DeadlineExceeded, tc.output)
+			errMsg := err.Error()
+
+			if !strings.Contains(errMsg, tc.expectedInMsg) {
+				t.Errorf("Expected error message to contain '%s', got: %s", tc.expectedInMsg, errMsg)
+			}
+		})
 	}
 }

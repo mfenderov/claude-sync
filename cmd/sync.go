@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -37,7 +38,24 @@ func runSync(cmd *cobra.Command, args []string) error {
 	log := logger.Default()
 	log.Title("🎭 Claude Config Sync")
 
-	// Get Claude directory
+	// Check if ~/.claude directory exists
+	claudeDirExists, err := git.ClaudeDirExists()
+	if err != nil {
+		log.Error("✗", "Failed to check Claude directory", err, "directory", "~/.claude")
+		return err
+	}
+
+	// If ~/.claude doesn't exist, run the first-time setup flow
+	if !claudeDirExists {
+		claudeDir, pathErr := git.ClaudeDirPath()
+		if pathErr != nil {
+			log.Error("✗", "Failed to get Claude directory path", pathErr)
+			return pathErr
+		}
+		return runFirstTimeSetup(ctx, log, claudeDir)
+	}
+
+	// Get Claude directory (we know it exists now)
 	claudeDir, err := git.GetClaudeDir()
 	if err != nil {
 		log.Error("✗", err.Error(), err, "directory", "~/.claude")
@@ -177,10 +195,104 @@ func showRecentActivity(ctx context.Context, log *logger.Logger, claudeDir strin
 	log.Box("Recent Activity", commitList.String())
 }
 
-// runInitFlow handles first-time setup when ~/.claude is not a git repo
-func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) error {
+// runFirstTimeSetup handles setup when ~/.claude doesn't exist at all
+func runFirstTimeSetup(ctx context.Context, log *logger.Logger, claudeDir string) error {
 	log.Newline()
 	log.Title("🎉 First Time Setup")
+	log.InfoMsg("📋", "No Claude Code configuration found at ~/.claude")
+	log.Muted("  Let's set that up!")
+	log.Newline()
+
+	// Ask user what they want to do
+	choice, err := prompts.Select("What would you like to do?", []prompts.Option{
+		{Label: "📥 Clone existing config (I have a repo already)", Value: "clone"},
+		{Label: "🆕 Start fresh (new configuration)", Value: "fresh"},
+	})
+	if err != nil {
+		log.Error("✗", "Failed to read input", err)
+		return err
+	}
+
+	if choice == "" {
+		log.InfoMsg("ℹ️", "Setup cancelled - you can run claude-sync again when ready")
+		log.Newline()
+		return nil
+	}
+	log.Newline()
+
+	if choice == "clone" {
+		return runCloneFlow(ctx, log, claudeDir)
+	}
+
+	// Start fresh - need to create the directory first
+	log.InfoMsg("⏳", "Creating ~/.claude directory...")
+	if err := createClaudeDir(claudeDir); err != nil {
+		log.Error("✗", "Failed to create directory", err, "directory", claudeDir)
+		return err
+	}
+	log.Success("✓", "Directory created")
+	log.Newline()
+
+	return runInitFlow(ctx, log, claudeDir)
+}
+
+// runCloneFlow handles cloning an existing config repo
+func runCloneFlow(ctx context.Context, log *logger.Logger, claudeDir string) error {
+	log.InfoMsg("📦", "Enter the URL of your existing Claude config repository")
+	log.Muted("  Example: git@github.com:username/claude-config.git")
+	log.Newline()
+
+	remoteURL, err := prompts.Input(
+		"🔗 Enter your git remote URL:",
+		"git@github.com:username/claude-config.git",
+	)
+	if err != nil {
+		log.Error("✗", "Failed to read input", err)
+		return err
+	}
+
+	if remoteURL == "" {
+		log.InfoMsg("ℹ️", "Setup cancelled - you can run claude-sync again when ready")
+		log.Newline()
+		return nil
+	}
+	log.Newline()
+
+	// Clone the repository
+	log.InfoMsg("⏳", "Cloning configuration...", "url", remoteURL)
+	if err := git.CloneRepo(ctx, remoteURL, claudeDir); err != nil {
+		log.Error("✗", "Failed to clone repository", err, "url", remoteURL)
+		log.Newline()
+		log.Warning("⚠️", "Please make sure:")
+		log.Muted("  1. The repository URL is correct")
+		log.Muted("  2. The repository exists and has commits")
+		log.Muted("  3. You have SSH keys set up (for git@ URLs)")
+		log.Newline()
+		return err
+	}
+	log.Success("✓", "Configuration cloned to ~/.claude")
+	log.Newline()
+
+	// Success!
+	log.Success("🎉", "Setup complete!")
+	log.InfoMsg("💡", "Your Claude Code config is ready!")
+	log.Muted("  Next steps:")
+	log.Muted("  • Run 'claude-sync' anytime to sync changes")
+	log.Muted("  • Your config is now synchronized across machines")
+	log.Newline()
+
+	return nil
+}
+
+// createClaudeDir creates the ~/.claude directory
+func createClaudeDir(path string) error {
+	return os.MkdirAll(path, 0o755)
+}
+
+// runInitFlow handles first-time setup when ~/.claude exists but is not a git repo
+func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) error {
+	log.Newline()
+	log.Title("🎉 Git Sync Setup")
 	log.InfoMsg("📋", "Claude Code configuration detected!", "directory", claudeDir)
 	log.Muted("  Let's set up git sync to keep your config synchronized across machines")
 	log.Newline()
@@ -277,10 +389,9 @@ func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) erro
 	log.Success("✓", "Remote added", "name", "origin", "url", remoteURL)
 	log.Newline()
 
-	// Step 8: Push to remote
+	// Step 8: Push to remote with upstream tracking
 	log.InfoMsg("⏳", "Pushing to remote...")
-	// Use push with -u to set upstream
-	if err := git.Push(ctx, claudeDir); err != nil {
+	if err := git.PushWithUpstream(ctx, claudeDir); err != nil {
 		log.Error("✗", "Failed to push", err)
 		log.Newline()
 		log.Warning("⚠️", "Git setup complete, but push failed")
