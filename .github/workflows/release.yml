@@ -13,14 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Set up Go
-        uses: actions/setup-go@0aaccf5e7e7ab9e5484bb3a81f71b4c18c1f1f0f
+        uses: actions/setup-go@v6
         with:
-          go-version: "1.23"
+          go-version-file: go.mod
+          cache: true
       
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@7abb51b123f8c226c8dcc8df9cc5f373285010e8
