@@ -51,6 +51,9 @@ var (
 	MutedStyle = lipgloss.NewStyle().
 			Foreground(Muted)
 
+	PrimaryStyle = lipgloss.NewStyle().
+			Foreground(Primary)
+
 	HeaderStyle = lipgloss.NewStyle().
 			Foreground(Primary).
 			Bold(true).

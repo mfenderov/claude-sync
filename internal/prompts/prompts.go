@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -237,4 +238,95 @@ func Select(prompt string, options []Option) (string, error) {
 		return "", fmt.Errorf("unexpected model type: %T", finalModel)
 	}
 	return finalSelect.selected, nil
+}
+
+// taskCompleteMsg signals that the background task has completed
+type taskCompleteMsg struct {
+	err error
+}
+
+// spinnerModel is a model for showing a spinner while a task runs
+//
+//nolint:govet // fieldalignment: struct field order optimized for readability
+type spinnerModel struct {
+	spinner  spinner.Model
+	message  string
+	done     bool
+	err      error
+	taskFunc func() error
+}
+
+// Init implements tea.Model
+func (m spinnerModel) Init() tea.Cmd {
+	return tea.Batch(
+		m.spinner.Tick,
+		m.runTask(),
+	)
+}
+
+// runTask starts the background task
+func (m spinnerModel) runTask() tea.Cmd {
+	return func() tea.Msg {
+		err := m.taskFunc()
+		return taskCompleteMsg{err: err}
+	}
+}
+
+// Update implements tea.Model
+func (m spinnerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case taskCompleteMsg:
+		m.done = true
+		m.err = msg.err
+		return m, tea.Quit
+
+	case tea.KeyMsg:
+		// Allow Ctrl+C to cancel (though the task will continue in background)
+		if msg.String() == "ctrl+c" {
+			m.done = true
+			m.err = fmt.Errorf("cancelled by user")
+			return m, tea.Quit
+		}
+
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+	}
+
+	return m, nil
+}
+
+// View implements tea.Model
+func (m spinnerModel) View() string {
+	if m.done {
+		return ""
+	}
+	return fmt.Sprintf("%s %s", ui.PrimaryStyle.Render(m.spinner.View()), m.message)
+}
+
+// SpinWhile shows an animated spinner while executing a task
+// The spinner style is "dots" with the primary color
+func SpinWhile(message string, task func() error) error {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = ui.PrimaryStyle
+
+	m := spinnerModel{
+		spinner:  s,
+		message:  message,
+		taskFunc: task,
+	}
+
+	p := tea.NewProgram(m)
+	finalModel, err := p.Run()
+	if err != nil {
+		return err
+	}
+
+	finalSpinner, ok := finalModel.(spinnerModel)
+	if !ok {
+		return fmt.Errorf("unexpected model type: %T", finalModel)
+	}
+	return finalSpinner.err
 }

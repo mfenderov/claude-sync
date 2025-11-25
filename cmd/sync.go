@@ -133,9 +133,13 @@ func commitLocalChanges(ctx context.Context, log *logger.Logger, claudeDir strin
 }
 
 func pullWithRebaseAndHandleConflicts(ctx context.Context, log *logger.Logger, claudeDir string) error {
-	log.InfoMsg("⏳", "Pulling from remote (with rebase)...", "directory", claudeDir)
-	if err := git.PullWithRebase(ctx, claudeDir); err != nil {
-		return handlePullError(ctx, log, claudeDir, err)
+	var pullErr error
+	err := prompts.SpinWhile("Pulling from remote...", func() error {
+		pullErr = git.PullWithRebase(ctx, claudeDir)
+		return pullErr
+	})
+	if err != nil {
+		return handlePullError(ctx, log, claudeDir, pullErr)
 	}
 	log.Success("✓", "Pulled latest changes")
 	log.Newline()
@@ -172,8 +176,10 @@ func handlePullError(ctx context.Context, log *logger.Logger, claudeDir string, 
 }
 
 func pushToRemote(ctx context.Context, log *logger.Logger, claudeDir string) error {
-	log.InfoMsg("⏳", "Pushing to remote...", "directory", claudeDir)
-	if err := git.Push(ctx, claudeDir); err != nil {
+	err := prompts.SpinWhile("Pushing to remote...", func() error {
+		return git.Push(ctx, claudeDir)
+	})
+	if err != nil {
 		log.Error("✗", "Failed to push", err, "directory", claudeDir)
 		return err
 	}
@@ -259,8 +265,10 @@ func runCloneFlow(ctx context.Context, log *logger.Logger, claudeDir string) err
 	log.Newline()
 
 	// Clone the repository
-	log.InfoMsg("⏳", "Cloning configuration...", "url", remoteURL)
-	if err := git.CloneRepo(ctx, remoteURL, claudeDir); err != nil {
+	err = prompts.SpinWhile("Cloning configuration...", func() error {
+		return git.CloneRepo(ctx, remoteURL, claudeDir)
+	})
+	if err != nil {
 		log.Error("✗", "Failed to clone repository", err, "url", remoteURL)
 		log.Newline()
 		log.Warning("⚠️", "Please make sure:")
@@ -336,8 +344,10 @@ func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) erro
 	log.Newline()
 
 	// Step 3: Validate remote exists
-	log.InfoMsg("⏳", "Validating remote repository...", "url", remoteURL)
-	if err := git.ValidateRemote(ctx, remoteURL); err != nil {
+	err = prompts.SpinWhile("Validating remote repository...", func() error {
+		return git.ValidateRemote(ctx, remoteURL)
+	})
+	if err != nil {
 		log.Error("✗", "Remote repository not accessible", err, "url", remoteURL)
 		log.Newline()
 		log.Warning("⚠️", "Please make sure:")
@@ -349,7 +359,7 @@ func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) erro
 		log.Newline()
 		return fmt.Errorf("remote repository not accessible")
 	}
-	log.Success("✓", "Remote repository verified!", "url", remoteURL)
+	log.Success("✓", "Remote repository verified!")
 	log.Newline()
 
 	// Step 4: Initialize git repo
@@ -390,8 +400,10 @@ func runInitFlow(ctx context.Context, log *logger.Logger, claudeDir string) erro
 	log.Newline()
 
 	// Step 8: Push to remote with upstream tracking
-	log.InfoMsg("⏳", "Pushing to remote...")
-	if err := git.PushWithUpstream(ctx, claudeDir); err != nil {
+	err = prompts.SpinWhile("Pushing to remote...", func() error {
+		return git.PushWithUpstream(ctx, claudeDir)
+	})
+	if err != nil {
 		log.Error("✗", "Failed to push", err)
 		log.Newline()
 		log.Warning("⚠️", "Git setup complete, but push failed")
