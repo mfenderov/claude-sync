@@ -130,7 +130,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 				newFile := filepath.Join(dir, "new.txt")
 				_ = os.WriteFile(newFile, []byte("new content"), 0o644)
 			},
-			expected: false,
+			expected: true, // Untracked files should be detected for syncing
 		},
 	}
 

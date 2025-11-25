@@ -52,21 +52,21 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		fmt.Println(ui.RenderError("✗", "Failed to get branch info"))
 		return err
 	}
-	displayRepositoryInfo(claudeDir, branch, ahead, behind, log)
+	displayRepositoryInfo(claudeDir, branch, ahead, behind)
 
 	// Display modified files if any
 	displayModifiedFiles(ctx, claudeDir, log)
 
 	// Display plugins, hooks, and skills
-	displayPlugins(claudeDir, log)
-	displayHooks(claudeDir, log)
-	displaySkills(claudeDir, log)
+	displayPlugins(claudeDir)
+	displayHooks(claudeDir)
+	displaySkills(claudeDir)
 
 	log.Newline()
 	return nil
 }
 
-func displayRepositoryInfo(claudeDir, branch string, ahead, behind int, log *logger.Logger) {
+func displayRepositoryInfo(claudeDir, branch string, ahead, behind int) {
 	remoteURL := getRemoteURL(claudeDir)
 
 	var repoInfo strings.Builder
@@ -78,7 +78,6 @@ func displayRepositoryInfo(claudeDir, branch string, ahead, behind int, log *log
 	repoInfo.WriteString(ui.InfoStyle.Render(branchInfo))
 
 	fmt.Println(ui.BoxStyle.Render(repoInfo.String()))
-	log.Info("Repository status", "branch", branch, "ahead", ahead, "behind", behind, "remote", remoteURL)
 }
 
 func formatBranchInfo(branch string, ahead, behind int) string {
@@ -124,10 +123,9 @@ func displayModifiedFiles(ctx context.Context, claudeDir string, log *logger.Log
 		changeInfo.WriteString("\n")
 	}
 	fmt.Println(ui.BoxStyle.Render(changeInfo.String()))
-	log.Warn("Uncommitted changes detected", "count", len(changedFiles), "files", changedFiles)
 }
 
-func displayPlugins(claudeDir string, log *logger.Logger) {
+func displayPlugins(claudeDir string) {
 	plugins := getEnabledPlugins(claudeDir)
 	if len(plugins) == 0 {
 		return
@@ -141,10 +139,9 @@ func displayPlugins(claudeDir string, log *logger.Logger) {
 		pluginInfo.WriteString("\n")
 	}
 	fmt.Println(ui.BoxStyle.Render(pluginInfo.String()))
-	log.Info("Enabled plugins", "count", len(plugins), "plugins", plugins)
 }
 
-func displayHooks(claudeDir string, log *logger.Logger) {
+func displayHooks(claudeDir string) {
 	hooks := getHooks(claudeDir)
 	if len(hooks) == 0 {
 		return
@@ -158,10 +155,9 @@ func displayHooks(claudeDir string, log *logger.Logger) {
 		hookInfo.WriteString("\n")
 	}
 	fmt.Println(ui.BoxStyle.Render(hookInfo.String()))
-	log.Info("Installed hooks", "count", len(hooks), "hooks", hooks)
 }
 
-func displaySkills(claudeDir string, log *logger.Logger) {
+func displaySkills(claudeDir string) {
 	skills := getSkills(claudeDir)
 	if len(skills) == 0 {
 		return
@@ -175,7 +171,6 @@ func displaySkills(claudeDir string, log *logger.Logger) {
 		skillInfo.WriteString("\n")
 	}
 	fmt.Println(ui.BoxStyle.Render(skillInfo.String()))
-	log.Info("Loaded skills", "count", len(skills), "skills", skills)
 }
 
 func getRemoteURL(repoPath string) string {

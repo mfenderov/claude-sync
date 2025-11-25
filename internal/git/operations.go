@@ -48,8 +48,9 @@ func GetClaudeDir() (string, error) {
 	return claudePath, nil
 }
 
-// HasUncommittedChanges checks if there are uncommitted changes
+// HasUncommittedChanges checks if there are uncommitted changes (tracked or untracked)
 func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
+	// Check for modified tracked files
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff-index", "--quiet", "HEAD", "--")
 	err := cmd.Run()
 	if err != nil {
@@ -62,27 +63,55 @@ func HasUncommittedChanges(ctx context.Context, repoPath string) (bool, error) {
 			Err:  err,
 		}
 	}
+
+	// Also check for untracked files (excluding ignored)
+	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "ls-files", "--others", "--exclude-standard")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, &OperationError{
+			Op:   "ls-files",
+			Path: repoPath,
+			Err:  err,
+		}
+	}
+	if strings.TrimSpace(string(output)) != "" {
+		return true, nil
+	}
+
 	return false, nil
 }
 
-// GetChangedFiles returns list of modified files
+// GetChangedFiles returns list of modified and untracked files
 func GetChangedFiles(ctx context.Context, repoPath string) ([]string, error) {
+	var allFiles []string
+
+	// Get modified tracked files
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--name-only", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get changed files: %w", err)
 	}
-
-	files := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(files) == 1 && files[0] == "" {
-		return []string{}, nil
+	if tracked := strings.TrimSpace(string(output)); tracked != "" {
+		allFiles = append(allFiles, strings.Split(tracked, "\n")...)
 	}
-	return files, nil
+
+	// Get untracked files (excluding ignored)
+	cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "ls-files", "--others", "--exclude-standard")
+	output, err = cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get untracked files: %w", err)
+	}
+	if untracked := strings.TrimSpace(string(output)); untracked != "" {
+		allFiles = append(allFiles, strings.Split(untracked, "\n")...)
+	}
+
+	return allFiles, nil
 }
 
-// CommitChanges commits all tracked changes
+// CommitChanges commits all changes (tracked and untracked)
 func CommitChanges(ctx context.Context, repoPath string, message string) error {
-	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "add", "-u")
+	// Stage all changes including untracked files (respects .gitignore)
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "add", "-A")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to stage changes: %w\nOutput: %s", err, string(output))
 	}

@@ -92,24 +92,17 @@ func runSync(cmd *cobra.Command, args []string) error {
 }
 
 func commitLocalChanges(ctx context.Context, log *logger.Logger, claudeDir string) error {
-	log.InfoMsg("⏳", "Checking for local changes...", "directory", claudeDir)
-	hasChanges, err := git.HasUncommittedChanges(ctx, claudeDir)
+	// Get changed files (both tracked and untracked)
+	changedFiles, err := git.GetChangedFiles(ctx, claudeDir)
 	if err != nil {
-		log.Error("✗", "Failed to check changes", err, "directory", claudeDir)
+		log.Error("✗", "Failed to check for changes", err, "directory", claudeDir)
 		return err
 	}
 
-	if !hasChanges {
+	if len(changedFiles) == 0 {
 		log.Success("✓", "No local changes")
 		log.Newline()
 		return nil
-	}
-
-	// Get changed files
-	changedFiles, err := git.GetChangedFiles(ctx, claudeDir)
-	if err != nil {
-		log.Error("✗", "Failed to get changed files", err, "directory", claudeDir)
-		return err
 	}
 
 	log.Success("✓", fmt.Sprintf("Found %d changed file(s)", len(changedFiles)),

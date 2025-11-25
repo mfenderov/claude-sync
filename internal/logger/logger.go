@@ -1,42 +1,26 @@
-// Package logger provides a beautiful structured logging wrapper around slog.
+// Package logger provides beautiful terminal output using Lipgloss styling.
 //
-// This package combines structured logging capabilities with beautiful terminal
-// output using Lipgloss styling. It's designed for CLI applications that need
-// both human-readable terminal output and machine-parsable structured logs.
+// This package provides a clean TUI experience for CLI applications,
+// with styled messages, icons, and boxes.
 package logger
 
 import (
 	"fmt"
-	"io"
-	"log/slog"
-	"os"
 
 	"github.com/mfenderov/claude-sync/internal/ui"
 )
 
-// Logger wraps slog with beautiful UI output
-type Logger struct {
-	*slog.Logger
-}
+// Logger provides beautiful TUI output
+type Logger struct{}
 
-// New creates a new logger with beautiful output
-func New(w io.Writer, level slog.Level) *Logger {
-	if w == nil {
-		w = os.Stdout
-	}
-
-	handler := slog.NewTextHandler(w, &slog.HandlerOptions{
-		Level: level,
-	})
-
-	return &Logger{
-		Logger: slog.New(handler),
-	}
+// New creates a new logger
+func New() *Logger {
+	return &Logger{}
 }
 
 // Default creates a logger for CLI output
 func Default() *Logger {
-	return New(os.Stdout, slog.LevelInfo)
+	return New()
 }
 
 // Title prints a styled title
@@ -46,43 +30,29 @@ func (l *Logger) Title(title string) {
 	fmt.Println()
 }
 
-// Success logs a success message with styling
-func (l *Logger) Success(icon, message string, args ...any) {
+// Success prints a success message with styling
+func (l *Logger) Success(icon, message string, _ ...any) {
 	fmt.Println(ui.RenderSuccess(icon, message))
-	if len(args) > 0 {
-		l.Info(message, args...)
-	}
 }
 
-// Error logs an error message with styling
-func (l *Logger) Error(icon, message string, err error, args ...any) {
+// Error prints an error message with styling
+func (l *Logger) Error(icon, message string, _ error, _ ...any) {
 	fmt.Println(ui.RenderError(icon, message))
-	combinedArgs := append([]any{"error", err}, args...)
-	l.Logger.Error(message, combinedArgs...)
 }
 
-// Warning logs a warning message with styling
-func (l *Logger) Warning(icon, message string, args ...any) {
+// Warning prints a warning message with styling
+func (l *Logger) Warning(icon, message string, _ ...any) {
 	fmt.Println(ui.RenderWarning(icon, message))
-	if len(args) > 0 {
-		l.Warn(message, args...)
-	}
 }
 
-// InfoMsg logs an info message with styling
-func (l *Logger) InfoMsg(icon, message string, args ...any) {
+// InfoMsg prints an info message with styling
+func (l *Logger) InfoMsg(icon, message string, _ ...any) {
 	fmt.Println(ui.RenderInfo(icon, message))
-	if len(args) > 0 {
-		l.Info(message, args...)
-	}
 }
 
 // Muted prints a muted message
-func (l *Logger) Muted(message string, args ...any) {
+func (l *Logger) Muted(message string, _ ...any) {
 	fmt.Println(ui.RenderMuted(message))
-	if len(args) > 0 {
-		l.Debug(message, args...)
-	}
 }
 
 // ListItem prints a styled list item
