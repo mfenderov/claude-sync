@@ -20,17 +20,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Lint
-        uses: golangci/golangci-lint-action@v8
+      - name: Install Task
+        uses: arduino/setup-task@v2
         with:
-          version: latest
+          version: 3.x
+
+      - name: Install tools
+        run: task install-tools
+
+      - name: Lint
+        run: task lint
 
   test:
     runs-on: ${{matrix.os}}
@@ -41,16 +47,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{matrix.go}}
           cache: true
-      
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
+      - name: Install tools
+        run: task install-tools
+
       - name: Run tests
-        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-      
+        run: task test
+
       - name: Upload coverage
         if: matrix.os == 'ubuntu-latest' && matrix.go == '1.25'
         uses: codecov/codecov-action@v5
@@ -64,12 +78,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
       - name: Build
-        run: go build -v ./...
+        run: task build
