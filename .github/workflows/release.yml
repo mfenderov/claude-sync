@@ -22,7 +22,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      
+
+      - name: Generate mocks
+        run: go tool mockery
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
