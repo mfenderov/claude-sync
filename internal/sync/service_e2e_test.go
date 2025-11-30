@@ -124,7 +124,7 @@ func (g *testGitAdapter) IsGitRepo(path string) bool {
 }
 
 func (g *testGitAdapter) InitRepo(ctx context.Context, path string) error {
-	cmd := exec.CommandContext(ctx, "git", "init", path)
+	cmd := exec.CommandContext(ctx, "git", "init", "--initial-branch=main", path)
 	return cmd.Run()
 }
 
