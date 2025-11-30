@@ -27,6 +27,7 @@ tasks:
     cmds:
       - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - go install gotest.tools/gotestsum@latest
+      - go install github.com/vektra/mockery/v3@latest
 
   build:
     desc: Build the binary with version info
@@ -45,18 +46,26 @@ tasks:
     cmds:
       - go install -ldflags "{{.LDFLAGS}}" {{.MAIN_PACKAGE}}
 
+  generate-mocks:
+    desc: Generate mocks using mockery
+    cmds:
+      - mockery
+
   test:
     desc: Run tests
+    deps: [generate-mocks]
     cmds:
       - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
 
   test-verbose:
     desc: Run tests with verbose output
+    deps: [generate-mocks]
     cmds:
       - go test -v -race -count=1 ./...
 
   test-coverage:
     desc: Run tests and show coverage
+    deps: [generate-mocks]
     cmds:
       - go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
       - go tool cover -html=coverage.txt -o coverage.html
@@ -90,10 +99,11 @@ tasks:
       - go mod verify
 
   clean:
-    desc: Clean build artifacts
+    desc: Clean build artifacts and generated mocks
     cmds:
       - rm -rf {{.BUILD_DIR}}
       - rm -f coverage.txt coverage.html
+      - find . -name '*_mock.go' -delete
 
   check:
     desc: Run all checks (fmt, vet, lint, test)

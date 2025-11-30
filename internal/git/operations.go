@@ -525,3 +525,48 @@ func ClaudeDirExists() (bool, error) {
 	}
 	return true, nil
 }
+
+// CreateClaudeDir creates the ~/.claude directory with appropriate permissions
+func CreateClaudeDir(path string) error {
+	return os.MkdirAll(path, 0o755)
+}
+
+// RemoteHasCommits checks if a remote repository has any commits
+func RemoteHasCommits(ctx context.Context, remoteURL string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "--heads", remoteURL)
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check remote: %w", err)
+	}
+	// If output contains any refs, the remote has commits
+	return strings.TrimSpace(string(output)) != "", nil
+}
+
+// Fetch fetches from remote without merging
+func Fetch(ctx context.Context, repoPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "fetch", "origin")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to fetch: %w\nOutput: %s", err, string(output))
+	}
+	return nil
+}
+
+// PullAllowUnrelatedHistories pulls from remote allowing unrelated histories
+func PullAllowUnrelatedHistories(ctx context.Context, repoPath string) error {
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "pull", "--no-rebase", "origin", "main", "--allow-unrelated-histories")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to merge histories: %w\nOutput: %s", err, string(output))
+	}
+	return nil
+}
+
+// RemoveClaudeDir removes the ~/.claude directory
+func RemoveClaudeDir() error {
+	path, err := ClaudeDirPath()
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(path)
+}

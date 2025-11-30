@@ -1,0 +1,14 @@
+# Mockery v3 configuration
+all: false
+template: testify
+dir: "{{.InterfaceDir}}"
+filename: "{{.InterfaceName}}_mock.go"
+pkgname: "{{.SrcPackageName}}"
+structname: "Mock{{.InterfaceName}}"
+
+packages:
+  github.com/mfenderov/claude-sync/internal/sync:
+    interfaces:
+      Prompter:
+      Logger:
+      GitOperator:

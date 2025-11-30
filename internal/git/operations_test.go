@@ -458,3 +458,271 @@ func TestEnhancePullError(t *testing.T) {
 		})
 	}
 }
+
+// createBareRepo creates a bare git repository for testing remote operations
+func createBareRepo(t *testing.T) string {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+	bareDir := filepath.Join(tmpDir, "remote.git")
+
+	cmd := exec.Command("git", "init", "--bare", bareDir)
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to init bare repo: %v", err)
+	}
+
+	return bareDir
+}
+
+// createRepoWithRemote creates a local repo connected to a bare remote
+func createRepoWithRemote(t *testing.T, bareRepoPath string) string {
+	t.Helper()
+
+	localDir := createTestRepo(t)
+
+	cmd := exec.Command("git", "-C", localDir, "remote", "add", "origin", bareRepoPath)
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to add remote: %v", err)
+	}
+
+	// Push to set up tracking
+	cmd = exec.Command("git", "-C", localDir, "push", "-u", "origin", "main")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Try master if main fails
+		cmd = exec.Command("git", "-C", localDir, "push", "-u", "origin", "master")
+		if output2, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("Failed to push: %v\nOutput: %s\n%s", err, output, output2)
+		}
+	}
+
+	return localDir
+}
+
+func TestRemoteHasCommits(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty remote has no commits", func(t *testing.T) {
+		t.Parallel()
+
+		bareRepo := createBareRepo(t)
+		ctx := context.Background()
+
+		hasCommits, err := RemoteHasCommits(ctx, bareRepo)
+		if err != nil {
+			t.Fatalf("RemoteHasCommits() error = %v", err)
+		}
+
+		if hasCommits {
+			t.Error("RemoteHasCommits() = true for empty repo, want false")
+		}
+	})
+
+	t.Run("remote with commits returns true", func(t *testing.T) {
+		t.Parallel()
+
+		bareRepo := createBareRepo(t)
+		_ = createRepoWithRemote(t, bareRepo) // This pushes a commit to bareRepo
+		ctx := context.Background()
+
+		hasCommits, err := RemoteHasCommits(ctx, bareRepo)
+		if err != nil {
+			t.Fatalf("RemoteHasCommits() error = %v", err)
+		}
+
+		if !hasCommits {
+			t.Error("RemoteHasCommits() = false for repo with commits, want true")
+		}
+	})
+
+	t.Run("invalid remote returns error", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		_, err := RemoteHasCommits(ctx, "/nonexistent/repo")
+		if err == nil {
+			t.Error("RemoteHasCommits() should error for invalid remote")
+		}
+	})
+}
+
+func TestFetch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("fetch from remote succeeds", func(t *testing.T) {
+		t.Parallel()
+
+		bareRepo := createBareRepo(t)
+		localRepo := createRepoWithRemote(t, bareRepo)
+		ctx := context.Background()
+
+		// Create a second repo, make changes, and push
+		secondRepo := createTestRepo(t)
+		cmd := exec.Command("git", "-C", secondRepo, "remote", "add", "origin", bareRepo)
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to add remote to second repo: %v", err)
+		}
+
+		// Pull first to get the existing commit
+		cmd = exec.Command("git", "-C", secondRepo, "fetch", "origin")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to fetch in second repo: %v", err)
+		}
+
+		cmd = exec.Command("git", "-C", secondRepo, "reset", "--hard", "origin/main")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			cmd = exec.Command("git", "-C", secondRepo, "reset", "--hard", "origin/master")
+			if _, err := cmd.CombinedOutput(); err != nil {
+				t.Logf("Reset output: %s", output)
+			}
+		}
+
+		// Make a change in second repo and push
+		newFile := filepath.Join(secondRepo, "new-file.txt")
+		if err := os.WriteFile(newFile, []byte("new content"), 0o644); err != nil {
+			t.Fatalf("Failed to create new file: %v", err)
+		}
+		cmd = exec.Command("git", "-C", secondRepo, "add", ".")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to add: %v", err)
+		}
+		cmd = exec.Command("git", "-C", secondRepo, "commit", "-m", "New commit from second repo")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to commit: %v", err)
+		}
+		cmd = exec.Command("git", "-C", secondRepo, "push", "origin", "HEAD")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("Failed to push from second repo: %v\nOutput: %s", err, output)
+		}
+
+		// Now fetch in the original local repo
+		err := Fetch(ctx, localRepo)
+		if err != nil {
+			t.Fatalf("Fetch() error = %v", err)
+		}
+
+		// Verify we can see the new commit
+		cmd = exec.Command("git", "-C", localRepo, "log", "--oneline", "origin/main")
+		output, err := cmd.Output()
+		if err != nil {
+			cmd = exec.Command("git", "-C", localRepo, "log", "--oneline", "origin/master")
+			output, err = cmd.Output()
+			if err != nil {
+				t.Fatalf("Failed to get log: %v", err)
+			}
+		}
+
+		if !strings.Contains(string(output), "New commit from second repo") {
+			t.Errorf("Fetch did not retrieve new commit. Log: %s", output)
+		}
+	})
+}
+
+func TestPullAllowUnrelatedHistories(t *testing.T) {
+	t.Parallel()
+
+	t.Run("merges unrelated histories", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+
+		// Create a bare repo with one history
+		bareRepo := createBareRepo(t)
+		repo1 := createTestRepo(t)
+
+		// Add remote and push first history
+		cmd := exec.Command("git", "-C", repo1, "remote", "add", "origin", bareRepo)
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to add remote: %v", err)
+		}
+		cmd = exec.Command("git", "-C", repo1, "push", "-u", "origin", "main")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			cmd = exec.Command("git", "-C", repo1, "push", "-u", "origin", "master")
+			if _, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("Failed to push: %v\nOutput: %s", err, output)
+			}
+		}
+
+		// Create a completely separate repo with different history
+		repo2 := createTestRepo(t)
+		differentFile := filepath.Join(repo2, "different.txt")
+		if err := os.WriteFile(differentFile, []byte("different content"), 0o644); err != nil {
+			t.Fatalf("Failed to create different file: %v", err)
+		}
+		cmd = exec.Command("git", "-C", repo2, "add", ".")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to add: %v", err)
+		}
+		cmd = exec.Command("git", "-C", repo2, "commit", "-m", "Different history commit")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to commit: %v", err)
+		}
+
+		// Add the same remote to repo2
+		cmd = exec.Command("git", "-C", repo2, "remote", "add", "origin", bareRepo)
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to add remote to repo2: %v", err)
+		}
+
+		// Fetch to get the remote refs
+		cmd = exec.Command("git", "-C", repo2, "fetch", "origin")
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("Failed to fetch: %v", err)
+		}
+
+		// Now try to merge with unrelated histories
+		err := PullAllowUnrelatedHistories(ctx, repo2)
+		if err != nil {
+			t.Fatalf("PullAllowUnrelatedHistories() error = %v", err)
+		}
+
+		// Verify both files exist (merged)
+		if _, err := os.Stat(filepath.Join(repo2, "test.txt")); os.IsNotExist(err) {
+			t.Error("test.txt should exist after merge")
+		}
+		if _, err := os.Stat(filepath.Join(repo2, "different.txt")); os.IsNotExist(err) {
+			t.Error("different.txt should exist after merge")
+		}
+	})
+}
+
+func TestRemoveClaudeDir(t *testing.T) {
+	// Note: This test manipulates HOME, so it cannot run in parallel
+
+	originalHome := os.Getenv("HOME")
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+
+	tmpHome := t.TempDir()
+	claudeDir := filepath.Join(tmpHome, ".claude")
+
+	// Create .claude directory with some content
+	if err := os.Mkdir(claudeDir, 0o755); err != nil {
+		t.Fatalf("Failed to create .claude dir: %v", err)
+	}
+
+	testFile := filepath.Join(claudeDir, "settings.json")
+	if err := os.WriteFile(testFile, []byte(`{"test": true}`), 0o644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Set HOME to our temp directory
+	if err := os.Setenv("HOME", tmpHome); err != nil {
+		t.Fatalf("Failed to set HOME: %v", err)
+	}
+
+	// Verify directory exists
+	if _, err := os.Stat(claudeDir); os.IsNotExist(err) {
+		t.Fatal("Setup failed: .claude directory doesn't exist")
+	}
+
+	// Remove it
+	err := RemoveClaudeDir()
+	if err != nil {
+		t.Fatalf("RemoveClaudeDir() error = %v", err)
+	}
+
+	// Verify it's gone
+	if _, err := os.Stat(claudeDir); !os.IsNotExist(err) {
+		t.Error("RemoveClaudeDir() did not remove the directory")
+	}
+}

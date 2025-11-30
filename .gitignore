@@ -31,3 +31,6 @@ Thumbs.db
 # Task temp files
 .task/
 vendor/
+
+# Generated mocks (regenerated before tests)
+*_mock.go

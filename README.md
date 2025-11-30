@@ -16,9 +16,22 @@ A CLI tool for syncing Claude Code configurations across machines. Built with [C
 
 ## 🚀 Installation
 
+### Homebrew (recommended)
+
+```bash
+brew tap mfenderov/tap
+brew install claude-sync
+```
+
+### Go Install
+
 ```bash
 go install github.com/mfenderov/claude-sync@latest
 ```
+
+### Binary Download
+
+Download from [GitHub Releases](https://github.com/mfenderov/claude-sync/releases).
 
 ## 📖 Usage
 
