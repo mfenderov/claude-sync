@@ -22,12 +22,8 @@ tasks:
     cmds:
       - task --list
 
-  install-tools:
-    desc: Install development tools
-    cmds:
-      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-      - go install gotest.tools/gotestsum@latest
-      - go install github.com/vektra/mockery/v3@latest
+  # Tools are managed via go.mod tool directive (Go 1.24+)
+  # Run with: go tool <name>, e.g., go tool golangci-lint
 
   build:
     desc: Build the binary with version info
@@ -49,7 +45,7 @@ tasks:
   generate-mocks:
     desc: Generate mocks using mockery
     cmds:
-      - mockery
+      - go tool mockery
 
   test:
     desc: Run tests
@@ -74,12 +70,12 @@ tasks:
   lint:
     desc: Run linter
     cmds:
-      - golangci-lint run ./...
+      - go tool golangci-lint run ./...
 
   lint-fix:
     desc: Run linter and auto-fix issues
     cmds:
-      - golangci-lint run --fix ./...
+      - go tool golangci-lint run --fix ./...
 
   fmt:
     desc: Format code

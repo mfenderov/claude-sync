@@ -32,9 +32,6 @@ jobs:
         with:
           version: 3.x
 
-      - name: Install tools
-        run: task install-tools
-
       - name: Lint
         run: task lint
 
@@ -58,9 +55,6 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           version: 3.x
-
-      - name: Install tools
-        run: task install-tools
 
       - name: Run tests
         run: task test
