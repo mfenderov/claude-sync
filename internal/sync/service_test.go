@@ -24,6 +24,7 @@ func TestService_Run_NormalSync(t *testing.T) {
 	git.EXPECT().GetChangedFiles(mock.Anything, claudeDir).Return([]string{"settings.json"}, nil)
 	git.EXPECT().GenerateAutoCommitMessage().Return("Auto-sync: 2024-01-01")
 	git.EXPECT().CommitChanges(mock.Anything, claudeDir, "Auto-sync: 2024-01-01").Return(nil)
+	git.EXPECT().HasUncommittedChanges(mock.Anything, claudeDir).Return(false, nil) // No leftover changes after commit
 	git.EXPECT().PullWithRebase(mock.Anything, claudeDir).Return(nil)
 	git.EXPECT().Push(mock.Anything, claudeDir).Return(nil)
 	git.EXPECT().GetRecentCommits(mock.Anything, claudeDir, 5).Return([]string{"abc123 Previous commit"}, nil)
@@ -65,7 +66,8 @@ func TestService_Run_NoChanges(t *testing.T) {
 	git.EXPECT().ClaudeDirExists().Return(true, nil)
 	git.EXPECT().GetClaudeDir().Return(claudeDir, nil)
 	git.EXPECT().IsGitRepo(claudeDir).Return(true)
-	git.EXPECT().GetChangedFiles(mock.Anything, claudeDir).Return([]string{}, nil) // No changes
+	git.EXPECT().GetChangedFiles(mock.Anything, claudeDir).Return([]string{}, nil)  // No changes
+	git.EXPECT().HasUncommittedChanges(mock.Anything, claudeDir).Return(false, nil) // Confirm no hidden changes
 	git.EXPECT().PullWithRebase(mock.Anything, claudeDir).Return(nil)
 	git.EXPECT().Push(mock.Anything, claudeDir).Return(nil)
 	git.EXPECT().GetRecentCommits(mock.Anything, claudeDir, 5).Return([]string{}, nil)
@@ -300,6 +302,50 @@ func TestService_FirstTimeSetup_Clone(t *testing.T) {
 	logger.EXPECT().Info(mock.Anything, mock.Anything).Maybe()
 	logger.EXPECT().Muted(mock.Anything).Maybe()
 	logger.EXPECT().Newline().Maybe()
+
+	service := NewService(git, prompter, logger)
+	ctx := context.Background()
+
+	err := service.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+}
+
+func TestService_Run_HiddenChanges(t *testing.T) {
+	// This tests the bug fix: GetChangedFiles returns empty but HasUncommittedChanges
+	// returns true (e.g., file permission changes or CRLF normalization)
+	t.Parallel()
+
+	git := NewMockGitOperator(t)
+	prompter := NewMockPrompter(t)
+	logger := NewMockLogger(t)
+
+	claudeDir := "/home/user/.claude"
+
+	// Setup expectations - GetChangedFiles misses some changes
+	git.EXPECT().ClaudeDirExists().Return(true, nil)
+	git.EXPECT().GetClaudeDir().Return(claudeDir, nil)
+	git.EXPECT().IsGitRepo(claudeDir).Return(true)
+	git.EXPECT().GetChangedFiles(mock.Anything, claudeDir).Return([]string{}, nil) // Reports no changes
+	git.EXPECT().HasUncommittedChanges(mock.Anything, claudeDir).Return(true, nil) // But there ARE changes!
+	git.EXPECT().GenerateAutoCommitMessage().Return("Auto-sync: 2024-01-01")
+	git.EXPECT().CommitChanges(mock.Anything, claudeDir, "Auto-sync: 2024-01-01").Return(nil)
+	git.EXPECT().PullWithRebase(mock.Anything, claudeDir).Return(nil)
+	git.EXPECT().Push(mock.Anything, claudeDir).Return(nil)
+	git.EXPECT().GetRecentCommits(mock.Anything, claudeDir, 5).Return([]string{}, nil)
+
+	// Logger expectations
+	logger.EXPECT().Title(mock.Anything).Maybe()
+	logger.EXPECT().Success(mock.Anything, mock.Anything).Maybe()
+	logger.EXPECT().Warning(mock.Anything, mock.Anything).Maybe() // Should warn about hidden changes
+	logger.EXPECT().Newline().Maybe()
+	logger.EXPECT().Box(mock.Anything, mock.Anything).Maybe()
+
+	// Prompter expectations
+	prompter.EXPECT().SpinWhile(mock.Anything, mock.Anything).RunAndReturn(func(msg string, task func() error) error {
+		return task()
+	}).Maybe()
 
 	service := NewService(git, prompter, logger)
 	ctx := context.Background()

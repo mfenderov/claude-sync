@@ -65,6 +65,7 @@ type GitOperator interface {
 	Fetch(ctx context.Context, path string) error
 
 	// Sync operations
+	HasUncommittedChanges(ctx context.Context, path string) (bool, error)
 	GetChangedFiles(ctx context.Context, path string) ([]string, error)
 	CommitChanges(ctx context.Context, path, message string) error
 	PullWithRebase(ctx context.Context, path string) error

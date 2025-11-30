@@ -61,6 +61,25 @@ func (s *Service) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Double-check for uncommitted changes before pull (catches edge cases like
+	// permission changes or CRLF normalization that GetChangedFiles might miss)
+	hasUncommitted, err := s.git.HasUncommittedChanges(ctx, claudeDir)
+	if err != nil {
+		s.logger.Error("✗", "Failed to check for uncommitted changes", err)
+		return err
+	}
+	if hasUncommitted {
+		// There are still uncommitted changes that our detection missed - commit them
+		s.logger.Warning("⚠️", "Detected additional changes (permissions/line endings)")
+		commitMsg := s.git.GenerateAutoCommitMessage()
+		if err := s.git.CommitChanges(ctx, claudeDir, commitMsg); err != nil {
+			s.logger.Error("✗", "Failed to commit additional changes", err)
+			return err
+		}
+		s.logger.Success("✓", "Additional changes committed")
+		s.logger.Newline()
+	}
+
 	if err := s.pullWithRebaseAndHandleConflicts(ctx, claudeDir); err != nil {
 		return err
 	}

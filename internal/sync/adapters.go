@@ -111,6 +111,10 @@ func (g *GitAdapter) Fetch(ctx context.Context, path string) error {
 }
 
 // Sync operations
+func (g *GitAdapter) HasUncommittedChanges(ctx context.Context, path string) (bool, error) {
+	return git.HasUncommittedChanges(ctx, path)
+}
+
 func (g *GitAdapter) GetChangedFiles(ctx context.Context, path string) ([]string, error) {
 	return git.GetChangedFiles(ctx, path)
 }

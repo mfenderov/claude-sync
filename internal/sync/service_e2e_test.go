@@ -167,6 +167,24 @@ func (g *testGitAdapter) Fetch(ctx context.Context, path string) error {
 	return runGit(ctx, path, "fetch", "origin")
 }
 
+func (g *testGitAdapter) HasUncommittedChanges(ctx context.Context, path string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", path, "diff-index", "--quiet", "HEAD", "--")
+	err := cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return true, nil // Has changes
+		}
+		return false, err
+	}
+	// Also check for untracked files
+	cmd = exec.CommandContext(ctx, "git", "-C", path, "ls-files", "--others", "--exclude-standard")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(output)) != "", nil
+}
+
 func (g *testGitAdapter) GetChangedFiles(ctx context.Context, path string) ([]string, error) {
 	cmd := exec.CommandContext(ctx, "git", "-C", path, "status", "--porcelain")
 	output, err := cmd.Output()
