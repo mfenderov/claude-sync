@@ -251,6 +251,9 @@ func runGit(ctx context.Context, path string, args ...string) error {
 		"GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=Test User",
 		"GIT_COMMITTER_EMAIL=test@example.com",
+		"GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=init.defaultBranch",
+		"GIT_CONFIG_VALUE_0=main",
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -275,7 +278,7 @@ func createBareRepo(t *testing.T, path string) {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatalf("Failed to create bare repo dir: %v", err)
 	}
-	cmd := exec.Command("git", "init", "--bare", path)
+	cmd := exec.Command("git", "init", "--bare", "--initial-branch=main", path)
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to init bare repo: %v", err)
 	}

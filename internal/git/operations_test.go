@@ -16,7 +16,7 @@ func createTestRepo(t *testing.T) string {
 
 	tmpDir := t.TempDir()
 
-	cmd := exec.Command("git", "init")
+	cmd := exec.Command("git", "init", "--initial-branch=main")
 	cmd.Dir = tmpDir
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to init git repo: %v", err)
@@ -466,7 +466,7 @@ func createBareRepo(t *testing.T) string {
 	tmpDir := t.TempDir()
 	bareDir := filepath.Join(tmpDir, "remote.git")
 
-	cmd := exec.Command("git", "init", "--bare", bareDir)
+	cmd := exec.Command("git", "init", "--bare", "--initial-branch=main", bareDir)
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to init bare repo: %v", err)
 	}
