@@ -203,6 +203,20 @@ func (g *testGitAdapter) GetChangedFiles(ctx context.Context, path string) ([]st
 	return files, nil
 }
 
+func (g *testGitAdapter) GetDiff(ctx context.Context, path string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", path, "diff", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback for new repos without HEAD
+		cmd = exec.CommandContext(ctx, "git", "-C", path, "diff", "--cached")
+		output, err = cmd.Output()
+		if err != nil {
+			return "", err
+		}
+	}
+	return string(output), nil
+}
+
 func (g *testGitAdapter) CommitChanges(ctx context.Context, path, message string) error {
 	if err := runGit(ctx, path, "add", "-A"); err != nil {
 		return err

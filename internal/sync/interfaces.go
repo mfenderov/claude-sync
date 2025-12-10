@@ -67,6 +67,7 @@ type GitOperator interface {
 	// Sync operations
 	HasUncommittedChanges(ctx context.Context, path string) (bool, error)
 	GetChangedFiles(ctx context.Context, path string) ([]string, error)
+	GetDiff(ctx context.Context, path string) (string, error)
 	CommitChanges(ctx context.Context, path, message string) error
 	PullWithRebase(ctx context.Context, path string) error
 	PullAllowUnrelatedHistories(ctx context.Context, path string) error

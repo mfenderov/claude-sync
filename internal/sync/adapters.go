@@ -119,6 +119,10 @@ func (g *GitAdapter) GetChangedFiles(ctx context.Context, path string) ([]string
 	return git.GetChangedFiles(ctx, path)
 }
 
+func (g *GitAdapter) GetDiff(ctx context.Context, path string) (string, error) {
+	return git.GetDiff(ctx, path)
+}
+
 func (g *GitAdapter) CommitChanges(ctx context.Context, path, message string) error {
 	return git.CommitChanges(ctx, path, message)
 }

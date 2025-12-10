@@ -297,6 +297,23 @@ func GenerateAutoCommitMessage() string {
 	return fmt.Sprintf("Auto-sync from %s at %s", hostname, timestamp)
 }
 
+// GetDiff returns the diff of all uncommitted changes (staged and unstaged).
+func GetDiff(ctx context.Context, repoPath string) (string, error) {
+	// Get diff of tracked files (staged and unstaged)
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		// If HEAD doesn't exist (new repo), get diff of staged files
+		cmd = exec.CommandContext(ctx, "git", "-C", repoPath, "diff", "--cached")
+		output, err = cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("failed to get diff: %w", err)
+		}
+	}
+
+	return string(output), nil
+}
+
 // IsGitRepo checks if the directory is a git repository
 func IsGitRepo(repoPath string) bool {
 	gitDir := filepath.Join(repoPath, ".git")

@@ -4,22 +4,26 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/mfenderov/claude-sync/internal/ai"
 )
 
 // Service handles the sync business logic with injected dependencies.
 // This allows for testing without actual TUI or git operations.
 type Service struct {
-	git      GitOperator
-	prompter Prompter
-	logger   Logger
+	git       GitOperator
+	prompter  Prompter
+	logger    Logger
+	commitGen *ai.CommitGenerator
 }
 
 // NewService creates a new sync service with the given dependencies.
 func NewService(git GitOperator, prompter Prompter, logger Logger) *Service {
 	return &Service{
-		git:      git,
-		prompter: prompter,
-		logger:   logger,
+		git:       git,
+		prompter:  prompter,
+		logger:    logger,
+		commitGen: ai.NewCommitGenerator(),
 	}
 }
 
@@ -116,7 +120,7 @@ func (s *Service) commitLocalChanges(ctx context.Context, claudeDir string) erro
 	}
 	s.logger.Newline()
 
-	commitMsg := s.git.GenerateAutoCommitMessage()
+	commitMsg := s.generateCommitMessage(ctx, claudeDir, changedFiles)
 	s.logger.Info("⏳", "Committing changes...")
 	if err := s.git.CommitChanges(ctx, claudeDir, commitMsg); err != nil {
 		s.logger.Error("✗", "Failed to commit", err)
@@ -126,6 +130,21 @@ func (s *Service) commitLocalChanges(ctx context.Context, claudeDir string) erro
 	s.logger.Muted("  " + commitMsg)
 	s.logger.Newline()
 	return nil
+}
+
+// generateCommitMessage tries to use AI to generate a commit message, falling back to timestamp.
+func (s *Service) generateCommitMessage(ctx context.Context, claudeDir string, changedFiles []string) string {
+	// Try AI-generated commit message first
+	diff, err := s.git.GetDiff(ctx, claudeDir)
+	if err == nil && diff != "" {
+		msg, err := s.commitGen.Generate(ctx, changedFiles, diff)
+		if err == nil && msg != "" {
+			return msg
+		}
+	}
+
+	// Fallback to timestamp-based message
+	return s.git.GenerateAutoCommitMessage()
 }
 
 // pullWithRebaseAndHandleConflicts pulls from remote and handles conflicts.

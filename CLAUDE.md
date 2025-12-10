@@ -37,6 +37,7 @@ The codebase uses **interface-based dependency injection** for testability. The 
 - `cmd/` - Cobra commands (root, sync, status, version)
 - `internal/sync/` - Core business logic (`Service` struct orchestrates sync flow)
 - `internal/git/` - Git operations (all take `context.Context` for cancellation)
+- `internal/ai/` - AI-powered commit message generation via Docker Model Runner
 - `internal/prompts/` - TUI prompts using Charm's bubbletea/bubbles
 - `internal/logger/` - Styled console output using lipgloss
 - `internal/ui/` - Shared UI styles

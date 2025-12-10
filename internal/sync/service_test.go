@@ -22,6 +22,7 @@ func TestService_Run_NormalSync(t *testing.T) {
 	git.EXPECT().GetClaudeDir().Return(claudeDir, nil)
 	git.EXPECT().IsGitRepo(claudeDir).Return(true)
 	git.EXPECT().GetChangedFiles(mock.Anything, claudeDir).Return([]string{"settings.json"}, nil)
+	git.EXPECT().GetDiff(mock.Anything, claudeDir).Return("", nil).Maybe() // AI will fallback due to empty diff
 	git.EXPECT().GenerateAutoCommitMessage().Return("Auto-sync: 2024-01-01")
 	git.EXPECT().CommitChanges(mock.Anything, claudeDir, "Auto-sync: 2024-01-01").Return(nil)
 	git.EXPECT().HasUncommittedChanges(mock.Anything, claudeDir).Return(false, nil) // No leftover changes after commit
