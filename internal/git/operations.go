@@ -399,35 +399,45 @@ func ensureDefaultBranch(ctx context.Context, repoPath string) error {
 	return nil
 }
 
-// SetupGitignore creates a .gitignore file with sensible defaults
+// SetupGitignore creates a .gitignore file with sensible defaults for Claude Code configs
 func SetupGitignore(repoPath string) error {
-	gitignoreContent := `# Credentials and secrets
+	gitignoreContent := `# Credentials (NEVER sync)
+.credentials.json
 credentials.json
 *.key
 *.pem
 *.p12
 *-key.json
 service-account*.json
-
-# AWS scripts (may contain credentials)
 aws-*.sh
-
-# Environment files
 .env
 .env.*
 
-# IDE and editor files
+# Session data (ephemeral, regenerated each session)
+history.jsonl
+debug/
+file-history/
+session-env/
+shell-snapshots/
+todos/
+plans/
+statsig/
+projects/
+security_warnings_state_*.json
+.last-doc-sync
+
+# Caches (auto-managed by Claude Code)
+plugins/
+ide/
+
+# IDE/OS files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS files
 .DS_Store
 Thumbs.db
-
-# Logs
 *.log
 `
 

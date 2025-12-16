@@ -57,8 +57,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Display modified files if any
 	displayModifiedFiles(ctx, claudeDir, log)
 
-	// Display plugins, hooks, and skills
+	// Display configuration components
 	displayPlugins(claudeDir)
+	displayAgents(claudeDir)
+	displayRules(claudeDir)
+	displayCommands(claudeDir)
 	displayHooks(claudeDir)
 	displaySkills(claudeDir)
 
@@ -173,6 +176,54 @@ func displaySkills(claudeDir string) {
 	fmt.Println(ui.BoxStyle.Render(skillInfo.String()))
 }
 
+func displayAgents(claudeDir string) {
+	agents := getAgents(claudeDir)
+	if len(agents) == 0 {
+		return
+	}
+
+	var agentInfo strings.Builder
+	agentInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("🤖 Agents (%d)", len(agents))))
+	agentInfo.WriteString("\n\n")
+	for _, agent := range agents {
+		agentInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + agent))
+		agentInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(agentInfo.String()))
+}
+
+func displayRules(claudeDir string) {
+	rules := getRules(claudeDir)
+	if len(rules) == 0 {
+		return
+	}
+
+	var ruleInfo strings.Builder
+	ruleInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("📏 Rules (%d)", len(rules))))
+	ruleInfo.WriteString("\n\n")
+	for _, rule := range rules {
+		ruleInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + rule))
+		ruleInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(ruleInfo.String()))
+}
+
+func displayCommands(claudeDir string) {
+	commands := getCommands(claudeDir)
+	if len(commands) == 0 {
+		return
+	}
+
+	var cmdInfo strings.Builder
+	cmdInfo.WriteString(ui.InfoStyle.Render(fmt.Sprintf("⚡ Commands (%d)", len(commands))))
+	cmdInfo.WriteString("\n\n")
+	for _, command := range commands {
+		cmdInfo.WriteString(ui.ListItemStyle.Render(ui.SuccessStyle.Render("✓") + " " + command))
+		cmdInfo.WriteString("\n")
+	}
+	fmt.Println(ui.BoxStyle.Render(cmdInfo.String()))
+}
+
 func getRemoteURL(repoPath string) string {
 	cmd := "git"
 	args := []string{"-C", repoPath, "config", "--get", "remote.origin.url"}
@@ -236,6 +287,57 @@ func getSkills(claudeDir string) []string {
 		}
 	}
 	return skills
+}
+
+func getAgents(claudeDir string) []string {
+	agentsDir := filepath.Join(claudeDir, "agents")
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil {
+		return []string{}
+	}
+
+	var agents []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			name := strings.TrimSuffix(entry.Name(), ".md")
+			agents = append(agents, name)
+		}
+	}
+	return agents
+}
+
+func getRules(claudeDir string) []string {
+	rulesDir := filepath.Join(claudeDir, "rules")
+	entries, err := os.ReadDir(rulesDir)
+	if err != nil {
+		return []string{}
+	}
+
+	var rules []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			name := strings.TrimSuffix(entry.Name(), ".md")
+			rules = append(rules, name)
+		}
+	}
+	return rules
+}
+
+func getCommands(claudeDir string) []string {
+	commandsDir := filepath.Join(claudeDir, "commands")
+	entries, err := os.ReadDir(commandsDir)
+	if err != nil {
+		return []string{}
+	}
+
+	var commands []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			name := strings.TrimSuffix(entry.Name(), ".md")
+			commands = append(commands, name)
+		}
+	}
+	return commands
 }
 
 func executeCommand(name string, args ...string) (string, error) {
