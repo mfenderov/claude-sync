@@ -47,7 +47,7 @@ The interactive setup will guide you through connecting to a git repository.
 
 ```bash
 claude-sync          # Commit, pull, push - all in one
-claude-sync status   # View repo info, plugins, hooks, skills
+claude-sync status   # View plugins, agents, rules, commands, hooks
 ```
 
 ### On Other Machines
