@@ -31,6 +31,7 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Lint
         run: task lint
@@ -55,6 +56,7 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
         run: task test
@@ -83,6 +85,7 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: task build
